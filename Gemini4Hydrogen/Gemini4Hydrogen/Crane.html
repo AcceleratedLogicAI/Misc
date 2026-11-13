@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Photorealistic 3D Glass Sphere &amp; Origami Crane — SVG</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at 50% 42%, #171d28 0%, #0b0e14 60%, #05070a 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    .canvas-frame {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2vmin;
+    }
+
+    svg#scene {
+      width: min(94vw, 94vh);
+      height: min(94vw, 94vh);
+      max-width: 1000px;
+      max-height: 1000px;
+      display: block;
+      filter: drop-shadow(0 24px 48px rgba(0, 0, 0, 0.65));
+    }
+  </style>
+</head>
+<body>
+  <div class="canvas-frame">
+    <svg id="scene" viewBox="0 0 1000 1000" width="1000" height="1000" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+      <defs>
+        <!-- ============================================================ -->
+        <!-- CLIP PATHS & MASKS                                           -->
+        <!-- ============================================================ -->
+        <clipPath id="sphereClip">
+          <circle cx="500" cy="480" r="300" />
+        </clipPath>
+
+        <clipPath id="innerGlassClip">
+          <circle cx="500" cy="480" r="296" />
+        </clipPath>
+
+        <!-- Mask to feather internal edge refractions near the perimeter -->
+        <radialGradient id="rimMaskGrad" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#000000" />
+          <stop offset="76%" stop-color="#111111" />
+          <stop offset="90%" stop-color="#999999" />
+          <stop offset="98%" stop-color="#ffffff" />
+          <stop offset="100%" stop-color="#000000" />
+        </radialGradient>
+        <mask id="rimRefractionMask">
+          <circle cx="500" cy="480" r="300" fill="url(#rimMaskGrad)" />
+        </mask>
+
+        <!-- ============================================================ -->
+        <!-- FILTERS (BLURS, CAUSTICS, WASHI PAPER MICRO-TEXTURE)         -->
+        <!-- ============================================================ -->
+        <filter id="softBlur4" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="4" />
+        </filter>
+
+        <filter id="softBlur10" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="10" />
+        </filter>
+
+        <filter id="softBlur22" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="22" />
+        </filter>
+
+        <filter id="heavyCausticBlur" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="30" />
+        </filter>
+
+        <!-- Subtle Japanese Washi Paper Fiber Texture -->
+        <filter id="washiPaper" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="3" seed="14" result="noise" />
+          <feColorMatrix type="matrix" values="
+            0 0 0 0 0.96
+            0 0 0 0 0.94
+            0 0 0 0 0.90
+            0 0 0 0.045 0" in="noise" result="coloredNoise" />
+          <feComposite in="coloredNoise" in2="SourceGraphic" operator="atop" />
+        </filter>
+
+        <!-- Crane Drop Shadow inside Glass -->
+        <filter id="craneInternalShadow" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="14" />
+        </filter>
+
+        <!-- ============================================================ -->
+        <!-- STUDIO BACKDROP & SURFACE GRADIENTS                          -->
+        <!-- ============================================================ -->
+        <radialGradient id="studioBg" cx="46%" cy="38%" r="68%">
+          <stop offset="0%" stop-color="#1f2736" />
+          <stop offset="48%" stop-color="#111620" />
+          <stop offset="85%" stop-color="#090c12" />
+          <stop offset="100%" stop-color="#05070a" />
+        </radialGradient>
+
+        <linearGradient id="tableSurface" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#0d1118" stop-opacity="0" />
+          <stop offset="28%" stop-color="#121824" stop-opacity="0.85" />
+          <stop offset="65%" stop-color="#0b0e15" stop-opacity="0.96" />
+          <stop offset="100%" stop-color="#06080c" stop-opacity="1" />
+        </linearGradient>
+
+        <radialGradient id="tableHorizonGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#4e6b8f" stop-opacity="0.22" />
+          <stop offset="55%" stop-color="#28384d" stop-opacity="0.08" />
+          <stop offset="100%" stop-color="#0d1118" stop-opacity="0" />
+        </radialGradient>
+
+        <!-- ============================================================ -->
+        <!-- CAST SHADOW & OPTICAL CAUSTIC GRADIENTS                      -->
+        <!-- ============================================================ -->
+        <radialGradient id="ambientShadowGrad" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#010204" stop-opacity="0.95" />
+          <stop offset="45%" stop-color="#030508" stop-opacity="0.72" />
+          <stop offset="78%" stop-color="#06090f" stop-opacity="0.28" />
+          <stop offset="100%" stop-color="#06090f" stop-opacity="0" />
+        </radialGradient>
+
+        <radialGradient id="causticCoreGrad" cx="48%" cy="48%" r="52%">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
+          <stop offset="22%" stop-color="#fff2d6" stop-opacity="0.78" />
+          <stop offset="50%" stop-color="#9be2ff" stop-opacity="0.36" />
+          <stop offset="78%" stop-color="#4da8da" stop-opacity="0.12" />
+          <stop offset="100%" stop-color="#1a3a52" stop-opacity="0" />
+        </radialGradient>
+
+        <radialGradient id="causticWarmScatter" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#ffdfa8" stop-opacity="0.55" />
+          <stop offset="55%" stop-color="#f2b872" stop-opacity="0.18" />
+          <stop offset="100%" stop-color="#f2b872" stop-opacity="0" />
+        </radialGradient>
+
+        <!-- ============================================================ -->
+        <!-- GLASS SPHERE OPTICAL VOLUME & REFRACTION GRADIENTS           -->
+        <!-- ============================================================ -->
+        <!-- Main glass body depth & edge absorption -->
+        <radialGradient id="glassVolumeGrad" cx="44%" cy="40%" r="56%">
+          <stop offset="0%" stop-color="#d8eef8" stop-opacity="0.05" />
+          <stop offset="52%" stop-color="#8bb8d0" stop-opacity="0.08" />
+          <stop offset="78%" stop-color="#4c7c99" stop-opacity="0.22" />
+          <stop offset="91%" stop-color="#9ad4ec" stop-opacity="0.44" />
+          <stop offset="97%" stop-color="#dff6ff" stop-opacity="0.68" />
+          <stop offset="100%" stop-color="#ffffff" stop-opacity="0.82" />
+        </radialGradient>
+
+        <!-- Deep dark internal shadow ring (Total Internal Reflection zone) -->
+        <radialGradient id="tirDarkRing" cx="50%" cy="50%" r="50%">
+          <stop offset="74%" stop-color="#08101a" stop-opacity="0" />
+          <stop offset="87%" stop-color="#070e17" stop-opacity="0.52" />
+          <stop offset="94%" stop-color="#0c1926" stop-opacity="0.72" />
+          <stop offset="98.5%" stop-color="#7ec4e6" stop-opacity="0.35" />
+          <stop offset="100%" stop-color="#ffffff" stop-opacity="0.65" />
+        </radialGradient>
+
+        <!-- Refracted inverted horizon gradient inside upper-back glass -->
+        <linearGradient id="refractedSkyArc" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#b9e2f5" stop-opacity="0.35" />
+          <stop offset="45%" stop-color="#3c5c78" stop-opacity="0.16" />
+          <stop offset="100%" stop-color="#091019" stop-opacity="0" />
+        </linearGradient>
+
+        <!-- Warm table bounce light refracted in bottom glass bowl -->
+        <radialGradient id="bottomGlassBounce" cx="52%" cy="88%" r="48%">
+          <stop offset="0%" stop-color="#ffe6bd" stop-opacity="0.46" />
+          <stop offset="35%" stop-color="#9cd6f0" stop-opacity="0.24" />
+          <stop offset="72%" stop-color="#32536e" stop-opacity="0.06" />
+          <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+        </radialGradient>
+
+        <!-- Top-left curved softbox reflection gradient -->
+        <linearGradient id="softboxHighlight" x1="15%" y1="10%" x2="85%" y2="90%">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.92" />
+          <stop offset="38%" stop-color="#f2f9ff" stop-opacity="0.56" />
+          <stop offset="75%" stop-color="#cde9fa" stop-opacity="0.18" />
+          <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+        </linearGradient>
+
+        <!-- Intense specular core -->
+        <radialGradient id="specularHotspot" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="1" />
+          <stop offset="35%" stop-color="#ffffff" stop-opacity="0.82" />
+          <stop offset="70%" stop-color="#d9f2ff" stop-opacity="0.25" />
+          <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+        </radialGradient>
+
+        <!-- Secondary lower-right rim reflection -->
+        <linearGradient id="rimBounceCrescent" x1="85%" y1="85%" x2="25%" y2="30%">
+          <stop offset="0%" stop-color="#ffebd2" stop-opacity="0.65" />
+          <stop offset="45%" stop-color="#a5dcf5" stop-opacity="0.32" />
+          <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+        </linearGradient>
+
+        <!-- ============================================================ -->
+        <!-- ORIGAMI CRANE 3D PAPER FACET GRADIENTS                       -->
+        <!-- Key light: cool white top-left | Rim light: warm gold right  -->
+        <!-- ============================================================ -->
+        <!-- Near Wing: Leading Plane (brightest lit paper) -->
+        <linearGradient id="wingNearLeading" x1="15%" y1="10%" x2="85%" y2="90%">
+          <stop offset="0%" stop-color="#ffffff" />
+          <stop offset="48%" stop-color="#f5f2eb" />
+          <stop offset="100%" stop-color="#e3ddd0" />
+        </linearGradient>
+
+        <!-- Near Wing: Trailing Plane (subtle camber shadow) -->
+        <linearGradient id="wingNearTrailing" x1="10%" y1="15%" x2="90%" y2="85%">
+          <stop offset="0%" stop-color="#eef1f6" />
+          <stop offset="52%" stop-color="#dad6cc" />
+          <stop offset="100%" stop-color="#bfb9ac" />
+        </linearGradient>
+
+        <!-- Far Wing: Upper Tip Facet -->
+        <linearGradient id="wingFarUpper" x1="20%" y1="0%" x2="80%" y2="100%">
+          <stop offset="0%" stop-color="#e8edf5" />
+          <stop offset="60%" stop-color="#c9cfd9" />
+          <stop offset="100%" stop-color="#aeb6c4" />
+        </linearGradient>
+
+        <!-- Far Wing: Lower Base Facet -->
+        <linearGradient id="wingFarLower" x1="15%" y1="10%" x2="85%" y2="95%">
+          <stop offset="0%" stop-color="#cfd5e0" />
+          <stop offset="65%" stop-color="#aeb6c4" />
+          <stop offset="100%" stop-color="#919aa9" />
+        </linearGradient>
+
+        <!-- Body: Front-Left Upper Chest -->
+        <linearGradient id="bodyChestUpper" x1="10%" y1="15%" x2="95%" y2="85%">
+          <stop offset="0%" stop-color="#fbf9f4" />
+          <stop offset="65%" stop-color="#e5dfd3" />
+          <stop offset="100%" stop-color="#cfc7b8" />
+        </linearGradient>
+
+        <!-- Body: Front-Left Lower Belly -->
+        <linearGradient id="bodyBellyLeft" x1="15%" y1="10%" x2="85%" y2="95%">
+          <stop offset="0%" stop-color="#e2dcd0" />
+          <stop offset="55%" stop-color="#c5beaf" />
+          <stop offset="100%" stop-color="#a69f91" />
+        </linearGradient>
+
+        <!-- Body: Right Upper Facet (cool shadow + warm bounce edge) -->
+        <linearGradient id="bodyRightUpper" x1="5%" y1="20%" x2="95%" y2="80%">
+          <stop offset="0%" stop-color="#c3c8d4" />
+          <stop offset="60%" stop-color="#a8afbd" />
+          <stop offset="100%" stop-color="#bfb6a8" />
+        </linearGradient>
+
+        <!-- Body: Right Lower Belly (warm amber bounce from bottom glass) -->
+        <linearGradient id="bodyBellyRight" x1="15%" y1="10%" x2="90%" y2="95%">
+          <stop offset="0%" stop-color="#a8afbd" />
+          <stop offset="52%" stop-color="#969ca8" />
+          <stop offset="100%" stop-color="#cbb89e" />
+        </linearGradient>
+
+        <!-- Body: Deep Hollow Under-Pocket -->
+        <linearGradient id="bodyUnderPocket" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#5d6473" />
+          <stop offset="50%" stop-color="#434957" />
+          <stop offset="100%" stop-color="#6b6359" />
+        </linearGradient>
+
+        <!-- Neck & Head: Left Lit Facets -->
+        <linearGradient id="neckLit" x1="0%" y1="10%" x2="100%" y2="90%">
+          <stop offset="0%" stop-color="#ffffff" />
+          <stop offset="55%" stop-color="#f1ede4" />
+          <stop offset="100%" stop-color="#d7d0c3" />
+        </linearGradient>
+
+        <linearGradient id="headLit" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ffffff" />
+          <stop offset="65%" stop-color="#ede8dd" />
+          <stop offset="100%" stop-color="#cfc8ba" />
+        </linearGradient>
+
+        <!-- Neck & Head: Right Shaded Facets -->
+        <linearGradient id="neckShaded" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#c6ccd6" />
+          <stop offset="60%" stop-color="#9fa7b5" />
+          <stop offset="100%" stop-color="#848c9c" />
+        </linearGradient>
+
+        <!-- Tail: Left Lit & Right Warm-Rim Facets -->
+        <linearGradient id="tailLeft" x1="20%" y1="0%" x2="80%" y2="100%">
+          <stop offset="0%" stop-color="#f7f4ed" />
+          <stop offset="55%" stop-color="#dcd6ca" />
+          <stop offset="100%" stop-color="#b8b2a6" />
+        </linearGradient>
+
+        <linearGradient id="tailRight" x1="85%" y1="10%" x2="15%" y2="95%">
+          <stop offset="0%" stop-color="#fff0d8" />
+          <stop offset="45%" stop-color="#cbbba6" />
+          <stop offset="100%" stop-color="#959ba8" />
+        </linearGradient>
+      </defs>
+
+      <!-- ============================================================== -->
+      <!-- LAYER 1: STUDIO BACKGROUND & REFLECTIVE TABLETOP               -->
+      <!-- ============================================================== -->
+      <rect width="1000" height="1000" fill="url(#studioBg)" />
+
+      <!-- Tabletop plane -->
+      <rect x="0" y="655" width="1000" height="345" fill="url(#tableSurface)" />
+      <ellipse cx="500" cy="775" rx="460" ry="95" fill="url(#tableHorizonGlow)" />
+
+      <!-- ============================================================== -->
+      <!-- LAYER 2: GROUND CONTACT SHADOW & FOCUSED OPTICAL CAUSTICS      -->
+      <!-- ============================================================== -->
+      <!-- Broad diffused studio drop shadow -->
+      <ellipse cx="524" cy="786" rx="235" ry="42" fill="url(#ambientShadowGrad)" filter="url(#softBlur10)" />
+
+      <!-- Tight dark ambient occlusion at contact point -->
+      <ellipse cx="502" cy="779" rx="118" ry="18" fill="#010204" opacity="0.92" filter="url(#softBlur4)" />
+
+      <!-- Focused refractive caustic light pool (ball-lens focal convergence) -->
+      <g style="mix-blend-mode: screen;">
+        <ellipse cx="546" cy="784" rx="155" ry="26" fill="url(#causticWarmScatter)" filter="url(#softBlur10)" />
+        <ellipse cx="542" cy="783" rx="92" ry="15" fill="url(#causticCoreGrad)" filter="url(#softBlur4)" />
+        <!-- Sharp caustic interference filaments -->
+        <path d="M 484 782 Q 540 773 598 783 Q 542 791 484 782 Z" fill="#fff8eb" opacity="0.58" filter="url(#softBlur4)" />
+        <ellipse cx="540" cy="783" rx="34" ry="5.5" fill="#ffffff" opacity="0.88" />
+      </g>
+
+      <!-- ============================================================== -->
+      <!-- LAYER 3: REAR HEMISPHERE OF THE GLASS SPHERE                   -->
+      <!-- ============================================================== -->
+      <g clip-path="url(#sphereClip)">
+        <!-- Base crystal sphere body -->
+        <circle cx="500" cy="480" r="300" fill="url(#glassVolumeGrad)" />
+
+        <!-- Refracted inverted studio horizon & curved background bands -->
+        <path d="M 190 430 Q 500 565 810 430 L 810 170 L 190 170 Z" fill="url(#refractedSkyArc)" opacity="0.65" />
+        <path d="M 205 565 Q 500 445 795 565 L 795 790 L 205 790 Z" fill="#070b12" opacity="0.48" />
+
+        <!-- Total Internal Reflection (TIR) dark outer glass wall -->
+        <circle cx="500" cy="480" r="300" fill="url(#tirDarkRing)" />
+
+        <!-- Warm table reflection refracted into the lower glass bowl -->
+        <circle cx="500" cy="480" r="298" fill="url(#bottomGlassBounce)" />
+
+        <!-- Subtle floating micro-bubbles / light motes inside crystal -->
+        <g fill="#e8f7ff" opacity="0.45">
+          <circle cx="342" cy="548" r="1.4" />
+          <circle cx="648" cy="492" r="1.2" />
+          <circle cx="612" cy="596" r="1.8" />
+          <circle cx="388" cy="348" r="1.1" />
+          <circle cx="548" cy="366" r="1.3" />
+          <circle cx="436" cy="618" r="1.0" />
+        </g>
+
+        <!-- Soft internal shadow cast by the origami crane onto lower glass -->
+        <ellipse cx="508" cy="656" rx="115" ry="22" fill="#04080f" opacity="0.42" filter="url(#craneInternalShadow)" />
+        <ellipse cx="504" cy="654" rx="68" ry="12" fill="#02050a" opacity="0.48" filter="url(#softBlur10)" />
+      </g>
+
+      <!-- ============================================================== -->
+      <!-- LAYER 4: 3D ORIGAMI CRANE (MULTI-FACETED + PAPER TEXTURE)      -->
+      <!-- ============================================================== -->
+      <g id="origami-crane" filter="url(#washiPaper)">
+        <!-- 1. FAR WING (Background Right Wing for 3D Depth) -->
+        <g id="crane-far-wing">
+          <!-- Lower inner wing facet -->
+          <polygon points="490,488 525,404 567,412 546,504" fill="url(#wingFarLower)" stroke="#8b94a3" stroke-width="0.7" stroke-linejoin="round" />
+          <!-- Upper wing blade facet -->
+          <polygon points="525,404 576,322 567,412" fill="url(#wingFarUpper)" stroke="#9aa3b2" stroke-width="0.7" stroke-linejoin="round" />
+          <!-- Subtle wing camber crease -->
+          <line x1="525" y1="404" x2="567" y2="412" stroke="#7c8594" stroke-width="0.9" opacity="0.65" />
+          <!-- Lit leading paper edge -->
+          <polyline points="490,488 525,404 576,322" fill="none" stroke="#f7f9fc" stroke-width="1.1" opacity="0.8" />
+        </g>
+
+        <!-- 2. TAIL (Sweeping Upward on the Right) -->
+        <g id="crane-tail">
+          <!-- Inner folded paper layer sliver (multi-ply origami thickness) -->
+          <polygon points="538,495 595,427 634,376 599,424 542,491" fill="#dcd5c9" opacity="0.85" />
+          <!-- Left lit tail facet -->
+          <polygon points="541,491 600,424 654,354 608,428 549,502" fill="url(#tailLeft)" stroke="#a39e93" stroke-width="0.65" stroke-linejoin="round" />
+          <!-- Right warm-rim tail facet -->
+          <polygon points="549,502 608,428 654,354 616,434 556,512" fill="url(#tailRight)" stroke="#8f8a80" stroke-width="0.65" stroke-linejoin="round" />
+          <!-- Central mountain fold ridge -->
+          <polyline points="549,502 608,428 654,354" fill="none" stroke="#fff8eb" stroke-width="1.1" opacity="0.85" />
+          <!-- Warm golden rim highlight along trailing right edge -->
+          <polyline points="556,512 616,434 654,354" fill="none" stroke="#ffebd0" stroke-width="1.2" opacity="0.85" />
+        </g>
+
+        <!-- 3. NECK & HEAD (Rising Gracefully on the Left) -->
+        <g id="crane-neck-head">
+          <!-- Neck shaded right facet -->
+          <polygon points="438,492 408,440 395,394 384,392 398,442 431,502" fill="url(#neckShaded)" stroke="#7e8694" stroke-width="0.65" stroke-linejoin="round" />
+          <!-- Inner multi-layer paper edge visible along back of neck -->
+          <polyline points="435,495 404,441 391,394" fill="none" stroke="#e8e4dc" stroke-width="0.9" opacity="0.7" />
+          <!-- Neck lit left facet -->
+          <polygon points="424,512 388,444 374,386 384,392 398,442 431,502" fill="url(#neckLit)" stroke="#b3ada2" stroke-width="0.65" stroke-linejoin="round" />
+
+          <!-- Head & Beak: Right/Under shaded facet -->
+          <polygon points="374,386 395,394 372,406 332,416" fill="url(#neckShaded)" stroke="#7d8594" stroke-width="0.65" stroke-linejoin="round" />
+          <!-- Head & Beak: Left lit facet -->
+          <polygon points="374,386 332,416 372,406 384,392" fill="url(#headLit)" stroke="#b5afa4" stroke-width="0.65" stroke-linejoin="round" />
+          <!-- Beak throat valley crease -->
+          <polyline points="332,416 372,406 384,392" fill="none" stroke="#7d8594" stroke-width="0.9" opacity="0.75" />
+          <!-- Crisp sunlit paper edge along neck & beak ridge -->
+          <polyline points="424,512 388,444 374,386 332,416" fill="none" stroke="#ffffff" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" />
+        </g>
+
+        <!-- 4. CENTRAL FOLDED DIAMOND BODY -->
+        <g id="crane-body">
+          <!-- Hollow under-pocket shadow between front & back body flaps -->
+          <polygon points="424,512 492,574 556,512 492,542" fill="url(#bodyUnderPocket)" />
+
+          <!-- Front-Left Upper Chest Facet -->
+          <polygon points="424,512 492,482 492,522" fill="url(#bodyChestUpper)" stroke="#b8b1a4" stroke-width="0.65" stroke-linejoin="round" />
+
+          <!-- Front-Left Lower Belly Facet -->
+          <polygon points="424,512 492,522 492,574" fill="url(#bodyBellyLeft)" stroke="#9e978b" stroke-width="0.65" stroke-linejoin="round" />
+
+          <!-- Right Upper Body Facet -->
+          <polygon points="492,482 556,512 492,522" fill="url(#bodyRightUpper)" stroke="#8e95a3" stroke-width="0.65" stroke-linejoin="round" />
+
+          <!-- Right Lower Belly Facet -->
+          <polygon points="492,522 556,512 492,574" fill="url(#bodyBellyRight)" stroke="#888e99" stroke-width="0.65" stroke-linejoin="round" />
+
+          <!-- Central vertical mountain fold highlight -->
+          <line x1="492" y1="484" x2="492" y2="574" stroke="#f7f4ed" stroke-width="1.15" opacity="0.85" />
+
+          <!-- Ambient occlusion shadow cast under the near wing hinge -->
+          <polygon points="438,505 492,501 542,505 532,519 492,516 448,519" fill="#3b4252" opacity="0.24" />
+        </g>
+
+        <!-- 5. NEAR WING (Foreground Left Hero Wing) -->
+        <g id="crane-near-wing">
+          <!-- Trailing Wing Plane (soft camber shadow) -->
+          <path d="M 492 500
+                   C 472 444, 454 374, 442 310
+                   C 476 376, 514 442, 542 505
+                   Q 517 502, 492 500 Z"
+                fill="url(#wingNearTrailing)"
+                stroke="#9ea5b3"
+                stroke-width="0.7"
+                stroke-linejoin="round" />
+
+          <!-- Leading Wing Plane (brightest sunlit facet) -->
+          <path d="M 440 505
+                   C 425 440, 428 372, 442 310
+                   C 454 374, 472 444, 492 500
+                   Q 466 502, 440 505 Z"
+                fill="url(#wingNearLeading)"
+                stroke="#c2bbb0"
+                stroke-width="0.7"
+                stroke-linejoin="round" />
+
+          <!-- Central wing camber ridge highlight -->
+          <path d="M 492 500 C 472 444, 454 374, 442 310"
+                fill="none"
+                stroke="#ffffff"
+                stroke-width="1.2"
+                opacity="0.9" />
+
+          <!-- Razor-sharp sunlit paper edge along outer wing contour -->
+          <path d="M 440 505 C 425 440, 428 372, 442 310"
+                fill="none"
+                stroke="#ffffff"
+                stroke-width="1.6"
+                stroke-linecap="round" />
+
+          <!-- Folded paper hinge edge at base of wing -->
+          <path d="M 440 505 Q 492 499 542 505"
+                fill="none"
+                stroke="#f5f1e8"
+                stroke-width="1.25"
+                stroke-linecap="round" />
+        </g>
+      </g>
+
+      <!-- ============================================================== -->
+      <!-- LAYER 5: INTERNAL REFRACTION & EDGE-CURVED GHOST REFLECTIONS   -->
+      <!-- ============================================================== -->
+      <g clip-path="url(#sphereClip)" mask="url(#rimRefractionMask)" style="mix-blend-mode: screen;">
+        <!-- Left inner wall curved refraction of the crane's bright paper -->
+        <path d="M 228 365 C 202 445, 206 535, 244 615 C 228 532, 226 446, 246 368 Z"
+              fill="#e6f5ff" opacity="0.48" filter="url(#softBlur4)" />
+        <path d="M 214 395 C 196 458, 198 525, 224 585"
+              fill="none" stroke="#8ce0ff" stroke-width="3.5" opacity="0.55" filter="url(#softBlur4)" />
+
+        <!-- Right inner wall warm-ivory curved refraction of the crane's tail -->
+        <path d="M 770 358 C 798 440, 794 532, 756 612 C 774 530, 776 442, 754 362 Z"
+              fill="#ffedd2" opacity="0.52" filter="url(#softBlur4)" />
+        <path d="M 784 390 C 802 456, 800 524, 774 584"
+              fill="none" stroke="#ffd296" stroke-width="3.5" opacity="0.55" filter="url(#softBlur4)" />
+
+        <!-- Bottom inner rim caustic arc -->
+        <path d="M 305 702 Q 500 792 695 702 Q 500 772 305 702 Z"
+              fill="#fff3db" opacity="0.62" filter="url(#softBlur4)" />
+      </g>
+
+      <!-- ============================================================== -->
+      <!-- LAYER 6: FRONT GLASS HEMISPHERE, SPECULAR & STUDIO REFLECTIONS -->
+      <!-- ============================================================== -->
+      <g clip-path="url(#sphereClip)">
+        <!-- Primary Curved Studio Softbox Window Reflection (Top-Left) -->
+        <g opacity="0.88">
+          <!-- Outer soft glow of window reflection -->
+          <path d="M 262 368
+                   C 282 276, 362 214, 464 198
+                   C 476 230, 480 264, 474 294
+                   C 396 306, 336 352, 314 416
+                   C 292 402, 274 386, 262 368 Z"
+                fill="url(#softboxHighlight)"
+                filter="url(#softBlur4)" />
+
+          <!-- Crisp main window pane reflection (quadrants warped to sphere) -->
+          <!-- Upper-Left Pane -->
+          <path d="M 274 358
+                   C 292 284, 356 232, 438 214
+                   L 444 252
+                   C 378 266, 328 308, 312 368 Z"
+                fill="url(#softboxHighlight)"
+                opacity="0.85" />
+
+          <!-- Upper-Right Pane -->
+          <path d="M 446 212
+                   C 456 210, 466 209, 476 208
+                   L 480 246
+                   C 470 247, 460 248, 452 250 Z"
+                fill="url(#softboxHighlight)"
+                opacity="0.65" />
+
+          <!-- Lower-Left Pane -->
+          <path d="M 310 375
+                   C 326 316, 376 274, 445 260
+                   L 450 288
+                   C 394 300, 352 334, 338 384 Z"
+                fill="url(#softboxHighlight)"
+                opacity="0.52" />
+
+          <!-- Intense Specular Pinpoint Core -->
+          <ellipse cx="352" cy="286" rx="34" ry="18" transform="rotate(-34 352 286)" fill="url(#specularHotspot)" />
+          <circle cx="346" cy="282" r="7.5" fill="#ffffff" />
+        </g>
+
+        <!-- Secondary Crisp Rim Highlight (Top-Right Grazing Arc) -->
+        <path d="M 608 214 A 286 286 0 0 1 756 358"
+              fill="none"
+              stroke="#e6f7ff"
+              stroke-width="2.4"
+              stroke-linecap="round"
+              opacity="0.52"
+              filter="url(#softBlur4)" />
+
+        <!-- Lower-Right Warm & Cool Crescent Bounce Reflection -->
+        <path d="M 768 552
+                 A 284 284 0 0 1 482 764
+                 A 296 296 0 0 0 778 525 Z"
+              fill="url(#rimBounceCrescent)"
+              opacity="0.78"
+              filter="url(#softBlur4)" />
+
+        <!-- Subtle Chromatic Dispersion & Fresnel Edge Rings -->
+        <!-- Outer cyan dispersion rim -->
+        <circle cx="500" cy="480" r="298.8" fill="none" stroke="#9be5ff" stroke-width="1.8" opacity="0.58" />
+        <!-- Inner warm amber dispersion fringe -->
+        <circle cx="500" cy="480" r="296.5" fill="none" stroke="#ffd8a8" stroke-width="1.4" opacity="0.34" />
+        <!-- Razor-sharp outer glass specular contour -->
+        <circle cx="500" cy="480" r="299.6" fill="none" stroke="#ffffff" stroke-width="0.9" opacity="0.65" />
+      </g>
+    </svg>
+  </div>
+</body>
+</html>

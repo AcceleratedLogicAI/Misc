@@ -1,0 +1,2231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aether Isles: Pastel Wizard Adventure</title>
+    <!-- Tailwind CSS for clean, responsive UI overlays -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js r128 for 3D rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Google Fonts: Fredoka for whimsical fantasy titles & Inter for crisp UI -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            background-color: #1e1b4b;
+        }
+
+        .font-display {
+            font-family: 'Fredoka', sans-serif;
+        }
+
+        #game-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+
+        #game-canvas:active {
+            cursor: grabbing;
+        }
+
+        /* Pastel Glassmorphism HUD Panels */
+        .pastel-glass {
+            background: rgba(255, 255, 255, 0.78);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 2px solid rgba(255, 255, 255, 0.9);
+            box-shadow: 0 10px 25px -5px rgba(76, 29, 149, 0.15), 0 4px 10px -2px rgba(76, 29, 149, 0.08);
+        }
+
+        .pastel-card {
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(250, 245, 255, 0.88));
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 3px solid rgba(255, 255, 255, 0.95);
+            box-shadow: 0 25px 50px -12px rgba(49, 16, 107, 0.35);
+        }
+
+        /* Vibrant Pastel Buttons */
+        .btn-pastel {
+            background: linear-gradient(135deg, #a78bfa 0%, #f472b6 100%);
+            transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease;
+            box-shadow: 0 6px 0 #7c3aed, 0 12px 20px rgba(124, 58, 237, 0.3);
+        }
+
+        .btn-pastel:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 0 #7c3aed, 0 16px 24px rgba(124, 58, 237, 0.38);
+        }
+
+        .btn-pastel:active {
+            transform: translateY(3px);
+            box-shadow: 0 3px 0 #7c3aed, 0 6px 12px rgba(124, 58, 237, 0.25);
+        }
+
+        /* Heart pulse & damage flash animations */
+        @keyframes heartPop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+            100% { transform: scale(1); }
+        }
+
+        .heart-pop {
+            animation: heartPop 0.35s ease-out;
+        }
+
+        @keyframes floatSlow {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-6px); }
+        }
+
+        .float-slow {
+            animation: floatSlow 3s ease-in-out infinite;
+        }
+
+        #damage-vignette {
+            pointer-events: none;
+            background: radial-gradient(circle, transparent 55%, rgba(244, 63, 94, 0.55) 100%);
+            opacity: 0;
+            transition: opacity 0.2s ease-out;
+        }
+
+        /* Virtual Joystick Styling */
+        #joystick-zone {
+            width: 120px;
+            height: 120px;
+            border-radius: 9999px;
+            background: rgba(255, 255, 255, 0.28);
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(6px);
+            position: relative;
+        }
+
+        #joystick-knob {
+            width: 48px;
+            height: 48px;
+            border-radius: 9999px;
+            background: linear-gradient(135deg, #ffffff, #e9d5ff);
+            box-shadow: 0 4px 12px rgba(76, 29, 149, 0.3);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Fullscreen 3D Canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Red Damage Flash Overlay -->
+    <div id="damage-vignette" class="fixed inset-0 z-10"></div>
+
+    <!-- Top HUD Overlay -->
+    <header id="hud" class="fixed top-0 left-0 right-0 z-20 p-3 sm:p-5 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        <!-- Left: Health & Dash Energy -->
+        <div class="flex items-center gap-2 sm:gap-3 pointer-events-auto">
+            <div class="pastel-glass rounded-2xl px-3.5 py-2 flex items-center gap-1.5" title="Wizard Health">
+                <div id="hearts-container" class="flex items-center gap-1"></div>
+            </div>
+
+            <div class="pastel-glass rounded-2xl px-3 py-2 hidden sm:flex items-center gap-2" title="Magic Dash Ready (Shift)">
+                <span class="text-xs font-bold uppercase tracking-wider text-indigo-700">Dash</span>
+                <div class="w-16 h-2.5 bg-indigo-100 rounded-full overflow-hidden border border-indigo-200">
+                    <div id="dash-bar" class="h-full bg-gradient-to-r from-cyan-400 to-indigo-500 rounded-full transition-all duration-75" style="width: 100%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center: Crystal Objective & Nearest Crystal Compass -->
+        <div class="flex items-center gap-2 pointer-events-auto">
+            <div class="pastel-glass rounded-2xl px-4 py-2 flex items-center gap-2.5">
+                <span class="inline-block w-3.5 h-3.5 rotate-45 bg-gradient-to-tr from-cyan-400 to-fuchsia-400 shadow-sm border border-white"></span>
+                <span class="font-display font-bold text-base sm:text-lg text-slate-800">
+                    <span id="crystal-count" class="text-indigo-600">0</span>
+                    <span class="text-slate-400 mx-0.5">/</span>
+                    <span id="crystal-total">8</span>
+                </span>
+                <span class="text-xs font-semibold text-slate-500 hidden md:inline">Crystals</span>
+            </div>
+
+            <!-- Directional Compass to Nearest Crystal -->
+            <div class="pastel-glass rounded-2xl px-3 py-2 flex items-center gap-1.5" title="Direction to nearest crystal">
+                <div id="compass-arrow" class="w-5 h-5 flex items-center justify-center text-fuchsia-600 font-bold transition-transform duration-75">
+                    ▲
+                </div>
+                <span id="compass-dist" class="text-xs font-bold text-slate-600 tabular-nums">12m</span>
+            </div>
+        </div>
+
+        <!-- Right: Day/Night Cycle Pill, Audio Toggle & Controls Info -->
+        <div class="flex items-center gap-2 pointer-events-auto">
+            <button id="btn-time" class="pastel-glass hover:bg-white/95 active:scale-95 transition rounded-2xl px-3 py-2 flex items-center gap-1.5 text-xs font-bold text-slate-700" title="Click to advance time of day">
+                <span id="time-icon" class="text-base leading-none">☀️</span>
+                <span id="time-label" class="hidden sm:inline">Pastel Day</span>
+            </button>
+
+            <button id="btn-audio" class="pastel-glass hover:bg-white/95 active:scale-95 transition rounded-2xl p-2 text-slate-700" title="Toggle Sound Effects" aria-label="Toggle Sound">
+                <span id="audio-icon" class="text-base leading-none block w-5 text-center">🔊</span>
+            </button>
+
+            <button id="btn-help" class="pastel-glass hover:bg-white/95 active:scale-95 transition rounded-2xl p-2 text-slate-700" title="Controls & Objectives" aria-label="Help">
+                <span class="text-base font-display font-bold leading-none block w-5 text-center text-indigo-600">?</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Floating Event Toast Banner -->
+    <div id="toast-banner" class="fixed top-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none opacity-0 transition-all duration-300 transform -translate-y-2">
+        <div class="pastel-glass rounded-full px-5 py-1.5 text-sm font-display font-semibold text-indigo-900 shadow-lg flex items-center gap-2">
+            <span id="toast-icon">✨</span>
+            <span id="toast-text">Crystal Shard Collected!</span>
+        </div>
+    </div>
+
+    <!-- Mobile / Touch On-Screen Controls -->
+    <div id="touch-controls" class="fixed bottom-5 left-5 right-5 z-20 flex items-end justify-between pointer-events-none md:hidden">
+        <!-- Virtual Thumbstick -->
+        <div id="joystick-zone" class="pointer-events-auto">
+            <div id="joystick-knob"></div>
+        </div>
+
+        <!-- Touch Action Buttons -->
+        <div class="flex items-center gap-3 pointer-events-auto">
+            <button id="touch-dash" class="w-14 h-14 rounded-full pastel-glass flex items-center justify-center font-display font-bold text-xs text-indigo-700 active:scale-90 transition shadow-lg">
+                DASH
+            </button>
+            <button id="touch-jump" class="w-16 h-16 rounded-full btn-pastel flex items-center justify-center font-display font-bold text-sm text-white active:scale-90 transition">
+                JUMP
+            </button>
+        </div>
+    </div>
+
+    <!-- Start / Title Screen Modal -->
+    <div id="start-modal" class="fixed inset-0 z-30 flex items-center justify-center p-4 bg-indigo-950/35 backdrop-blur-sm">
+        <div class="pastel-card rounded-3xl max-w-lg w-full p-6 sm:p-8 text-center relative overflow-hidden">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-bold uppercase tracking-wider mb-3">
+                <span>✨ 3D Pastel Action-Adventure</span>
+            </div>
+
+            <h1 class="font-display text-3xl sm:text-4xl font-bold text-slate-800 mb-2 tracking-tight">
+                Aether Isles
+            </h1>
+            <p class="text-slate-600 text-sm sm:text-base mb-6 leading-relaxed">
+                Explore the floating pastel archipelago, gather all <strong class="text-indigo-600">8 glowing crystal artifacts</strong>, and dodge automated elemental turrets across day and starlit night.
+            </p>
+
+            <!-- Controls Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-7 text-left">
+                <div class="bg-white/80 rounded-2xl p-3 border border-purple-100">
+                    <div class="text-xs font-bold text-indigo-600 mb-0.5">WASD / Arrows</div>
+                    <div class="text-xs text-slate-500">Move Wizard</div>
+                </div>
+                <div class="bg-white/80 rounded-2xl p-3 border border-purple-100">
+                    <div class="text-xs font-bold text-pink-600 mb-0.5">Spacebar x2</div>
+                    <div class="text-xs text-slate-500">Double Jump</div>
+                </div>
+                <div class="bg-white/80 rounded-2xl p-3 border border-purple-100">
+                    <div class="text-xs font-bold text-cyan-600 mb-0.5">Shift Key</div>
+                    <div class="text-xs text-slate-500">Arcane Dash</div>
+                </div>
+                <div class="bg-white/80 rounded-2xl p-3 border border-purple-100">
+                    <div class="text-xs font-bold text-amber-600 mb-0.5">Mouse Drag</div>
+                    <div class="text-xs text-slate-500">Orbit Camera</div>
+                </div>
+            </div>
+
+            <button id="btn-start" class="btn-pastel w-full py-3.5 px-6 rounded-2xl font-display font-bold text-lg text-white tracking-wide cursor-pointer">
+                Begin Adventure
+            </button>
+        </div>
+    </div>
+
+    <!-- Victory / Game Over Modal -->
+    <div id="end-modal" class="fixed inset-0 z-30 hidden items-center justify-center p-4 bg-indigo-950/45 backdrop-blur-sm">
+        <div class="pastel-card rounded-3xl max-w-md w-full p-6 sm:p-8 text-center">
+            <div id="end-badge" class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-tr from-amber-300 to-pink-400 flex items-center justify-center text-3xl shadow-lg float-slow">
+                👑
+            </div>
+            <h2 id="end-title" class="font-display text-3xl font-bold text-slate-800 mb-2">
+                Archipelago Restored!
+            </h2>
+            <p id="end-subtitle" class="text-slate-600 text-sm sm:text-base mb-6">
+                You gathered every crystal artifact across the floating islands!
+            </p>
+
+            <div class="grid grid-cols-2 gap-3 mb-7">
+                <div class="bg-white/85 rounded-2xl p-3.5 border border-purple-100">
+                    <div class="text-xs font-semibold text-slate-400 uppercase">Crystals</div>
+                    <div id="end-crystals" class="font-display text-2xl font-bold text-indigo-600 mt-0.5">8 / 8</div>
+                </div>
+                <div class="bg-white/85 rounded-2xl p-3.5 border border-purple-100">
+                    <div class="text-xs font-semibold text-slate-400 uppercase">Time</div>
+                    <div id="end-time" class="font-display text-2xl font-bold text-pink-600 mt-0.5">00:45</div>
+                </div>
+            </div>
+
+            <button id="btn-restart" class="btn-pastel w-full py-3.5 px-6 rounded-2xl font-display font-bold text-lg text-white tracking-wide cursor-pointer">
+                Play Again
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * ============================================================================
+         * AETHER ISLES: 3D PASTEL WIZARD ACTION-ADVENTURE
+         * Self-contained Three.js game with procedural low-poly art, custom 3D
+         * platformer physics, dynamic day-night cycle, elemental turrets, particle
+         * effects, and Web Audio API procedural sound synthesis.
+         * ============================================================================
+         */
+
+        // ----------------------------------------------------------------------------
+        // 1. WEB AUDIO API PROCEDURAL SOUND SYNTHESIZER
+        // ----------------------------------------------------------------------------
+        class SoundEffects {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) {
+                        this.ctx = new AudioCtx();
+                    }
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            toggleMute() {
+                this.muted = !this.muted;
+                return this.muted;
+            }
+
+            playJump(isDouble = false) {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = isDouble ? 'sine' : 'triangle';
+                const baseFreq = isDouble ? 360 : 230;
+                const endFreq = isDouble ? 680 : 460;
+
+                osc.frequency.setValueAtTime(baseFreq, now);
+                osc.frequency.exponentialRampToValueAtTime(endFreq, now + 0.18);
+
+                gain.gain.setValueAtTime(0.14, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.21);
+            }
+
+            playDash() {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(520, now);
+                osc.frequency.exponentialRampToValueAtTime(160, now + 0.22);
+
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.25);
+            }
+
+            playCollect(count = 1) {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const now = this.ctx.currentTime;
+                // Sparkly pastel chime arpeggio
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                const pitchShift = 1 + (count % 5) * 0.04;
+
+                notes.forEach((freq, i) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq * pitchShift, now + i * 0.055);
+
+                    gain.gain.setValueAtTime(0.001, now + i * 0.055);
+                    gain.gain.linearRampToValueAtTime(0.14, now + i * 0.055 + 0.015);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.055 + 0.32);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(now + i * 0.055);
+                    osc.stop(now + i * 0.055 + 0.34);
+                });
+            }
+
+            playTurretFire(distance = 10) {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                // Attenuate distant turret shots
+                const vol = Math.max(0.02, Math.min(0.1, 1.2 / Math.max(6, distance)));
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(340, now);
+                osc.frequency.exponentialRampToValueAtTime(110, now + 0.16);
+
+                gain.gain.setValueAtTime(vol, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.18);
+            }
+
+            playHurt() {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(185, now);
+                osc.frequency.linearRampToValueAtTime(75, now + 0.32);
+
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.35);
+            }
+
+            playVictory() {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const now = this.ctx.currentTime;
+                const chord = [523.25, 659.25, 783.99, 987.77, 1046.50];
+                chord.forEach((freq, i) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now + i * 0.09);
+
+                    gain.gain.setValueAtTime(0.15, now + i * 0.09);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.09 + 0.65);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now + i * 0.09);
+                    osc.stop(now + i * 0.09 + 0.7);
+                });
+            }
+
+            playGameOver() {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const now = this.ctx.currentTime;
+                const notes = [392.00, 349.23, 311.13, 261.63];
+                notes.forEach((freq, i) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now + i * 0.16);
+
+                    gain.gain.setValueAtTime(0.16, now + i * 0.16);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.16 + 0.45);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now + i * 0.16);
+                    osc.stop(now + i * 0.16 + 0.5);
+                });
+            }
+        }
+
+        // ----------------------------------------------------------------------------
+        // 2. GAME CONFIGURATION & ARCHIPELAGO LEVEL DATA
+        // ----------------------------------------------------------------------------
+        const CONFIG = {
+            PLAYER_SPEED: 11.2,
+            DASH_SPEED: 23.5,
+            DASH_DURATION: 0.22,
+            DASH_COOLDOWN: 1.35,
+            JUMP_FORCE: 13.8,
+            DOUBLE_JUMP_FORCE: 12.2,
+            GRAVITY: 32.0,
+            PLAYER_RADIUS: 0.52,
+            PLAYER_HEIGHT: 1.85,
+            MAX_HEALTH: 5,
+            INVULN_DURATION: 1.25,
+            DAY_CYCLE_SECONDS: 72.0,
+            FALL_LIMIT_Y: -18.0
+        };
+
+        // Pastel color palette for low-poly islands & props
+        const PALETTE = {
+            grassMint: 0x98f5e1,
+            grassPink: 0xffcfd2,
+            grassLavender: 0xcfbfef,
+            grassPeach: 0xfde4cf,
+            grassSky: 0xa3c4f3,
+            rockWarm: 0xd8bbff,
+            rockSlate: 0xb8c0ff,
+            rockPeach: 0xffd6a5,
+            foliagePink: 0xffafcc,
+            foliageMint: 0xb9fbc0,
+            foliageGold: 0xfef08a,
+            trunkWood: 0x9d8189
+        };
+
+        // Floating island platform definitions (AABB colliders + visual styling)
+        const ISLAND_LAYOUT = [
+            // 1. Sanctuary Isle (Starting Island)
+            { x: 0, y: -1, z: 0, w: 16, h: 2, d: 16, topColor: PALETTE.grassMint, rockColor: PALETTE.rockWarm, isSafeSpawn: true, trees: 4 },
+            // Stepping stones East -> Blossom Terrace
+            { x: 11.2, y: 0.2, z: -2, w: 4.2, h: 1.2, d: 4.2, topColor: PALETTE.grassPink, rockColor: PALETTE.rockSlate, isStep: true },
+            // 2. Blossom Terrace
+            { x: 20.5, y: 1.0, z: -4, w: 13.5, h: 2, d: 13.5, topColor: PALETTE.grassPink, rockColor: PALETTE.rockWarm, isSafeSpawn: true, trees: 3 },
+            // Elevated Altar on Blossom Terrace
+            { x: 22.0, y: 3.1, z: -7.5, w: 5.2, h: 1.4, d: 5.2, topColor: PALETTE.grassPeach, rockColor: PALETTE.rockPeach, isStep: true },
+
+            // Stepping stones North -> Frost Ruins
+            { x: 0, y: 0.4, z: -11.5, w: 4.2, h: 1.2, d: 4.2, topColor: PALETTE.grassSky, rockColor: PALETTE.rockSlate, isStep: true },
+            { x: -3.2, y: 1.5, z: -18.2, w: 4.2, h: 1.2, d: 4.2, topColor: PALETTE.grassLavender, rockColor: PALETTE.rockSlate, isStep: true },
+            // 3. Frost Spire Ruins
+            { x: -4.5, y: 2.4, z: -28.5, w: 15, h: 2, d: 15, topColor: PALETTE.grassSky, rockColor: PALETTE.rockSlate, isSafeSpawn: true, trees: 3 },
+
+            // Stepping stones West -> Sunset Amphitheater
+            { x: -11.2, y: -0.1, z: 2.2, w: 4.2, h: 1.2, d: 4.2, topColor: PALETTE.grassPeach, rockColor: PALETTE.rockPeach, isStep: true },
+            { x: -17.5, y: 0.8, z: 5.8, w: 4.2, h: 1.2, d: 4.2, topColor: PALETTE.grassPeach, rockColor: PALETTE.rockPeach, isStep: true },
+            // 4. Sunset Amphitheater
+            { x: -26.5, y: 1.5, z: 8.5, w: 14, h: 2, d: 14, topColor: PALETTE.grassPeach, rockColor: PALETTE.rockPeach, isSafeSpawn: true, trees: 4 },
+
+            // Ascending Sky Bridge to Starlight Citadel
+            { x: 5.5, y: 3.8, z: -25.5, w: 4.2, h: 1.2, d: 4.2, topColor: PALETTE.grassLavender, rockColor: PALETTE.rockWarm, isStep: true },
+            { x: 11.8, y: 5.2, z: -23.0, w: 4.2, h: 1.2, d: 4.2, topColor: PALETTE.grassPink, rockColor: PALETTE.rockWarm, isStep: true },
+            { x: 17.5, y: 3.5, z: -13.5, w: 4.2, h: 1.2, d: 4.2, topColor: PALETTE.grassLavender, rockColor: PALETTE.rockWarm, isStep: true },
+            // 5. Starlight Citadel (High Summit)
+            { x: 13.0, y: 6.4, z: -24.0, w: 14.5, h: 2, d: 14.5, topColor: PALETTE.grassLavender, rockColor: PALETTE.rockWarm, isSafeSpawn: true, trees: 3 },
+
+            // South-East Stepping Stones -> Breeze Gardens
+            { x: 8.5, y: -0.2, z: 10.5, w: 4.2, h: 1.2, d: 4.2, topColor: PALETTE.grassMint, rockColor: PALETTE.rockSlate, isStep: true },
+            { x: 14.8, y: 0.6, z: 16.0, w: 4.2, h: 1.2, d: 4.2, topColor: PALETTE.grassMint, rockColor: PALETTE.rockSlate, isStep: true },
+            // 6. Breeze Gardens
+            { x: 22.5, y: 1.4, z: 20.5, w: 13.5, h: 2, d: 13.5, topColor: PALETTE.grassMint, rockColor: PALETTE.rockSlate, isSafeSpawn: true, trees: 4 },
+
+            // South-West Stepping Stones -> Cloudtop Observatory
+            { x: -24.0, y: 2.8, z: 18.0, w: 4.2, h: 1.2, d: 4.2, topColor: PALETTE.grassSky, rockColor: PALETTE.rockWarm, isStep: true },
+            { x: -18.0, y: 4.2, z: 23.5, w: 4.2, h: 1.2, d: 4.2, topColor: PALETTE.grassPink, rockColor: PALETTE.rockWarm, isStep: true },
+            // 7. Cloudtop Observatory
+            { x: -10.5, y: 5.4, z: 26.0, w: 13, h: 2, d: 13, topColor: PALETTE.grassPink, rockColor: PALETTE.rockWarm, isSafeSpawn: true, trees: 3 }
+        ];
+
+        // 8 Glowing Crystal Artifact locations
+        const CRYSTAL_LOCATIONS = [
+            { x: 0, y: 1.4, z: -5.2 },       // 1. Sanctuary Vista
+            { x: 21.0, y: 3.4, z: -2.0 },    // 2. Blossom Terrace Lower
+            { x: 22.0, y: 5.2, z: -7.5 },    // 3. Blossom Terrace High Altar
+            { x: -4.5, y: 4.8, z: -32.5 },   // 4. Frost Spire Ruins
+            { x: -28.0, y: 3.9, z: 7.0 },    // 5. Sunset Amphitheater
+            { x: 13.0, y: 8.8, z: -24.0 },   // 6. Starlight Citadel Summit
+            { x: 24.0, y: 3.8, z: 22.0 },    // 7. Breeze Gardens
+            { x: -10.5, y: 7.8, z: 27.5 }    // 8. Cloudtop Observatory
+        ];
+
+        // Elemental Turret placements
+        const TURRET_LOCATIONS = [
+            { x: 24.2, y: 2.0, z: -5.8, element: 'fire', range: 24, cooldown: 2.3 },
+            { x: -8.5, y: 3.4, z: -31.0, element: 'frost', range: 25, cooldown: 2.5 },
+            { x: 0.5, y: 3.4, z: -31.5, element: 'arcane', range: 25, cooldown: 2.7 },
+            { x: -29.5, y: 2.5, z: 11.2, element: 'fire', range: 24, cooldown: 2.3 },
+            { x: 9.0, y: 7.4, z: -27.5, element: 'arcane', range: 26, cooldown: 2.2 },
+            { x: 17.0, y: 7.4, z: -21.0, element: 'frost', range: 26, cooldown: 2.4 },
+            { x: 25.0, y: 2.4, z: 17.5, element: 'arcane', range: 24, cooldown: 2.4 },
+            { x: -13.5, y: 6.4, z: 23.0, element: 'fire', range: 24, cooldown: 2.2 }
+        ];
+
+        // ----------------------------------------------------------------------------
+        // 3. MAIN GAME ENGINE CLASS
+        // ----------------------------------------------------------------------------
+        class AetherIslesGame {
+            constructor() {
+                this.canvas = document.getElementById('game-canvas');
+                this.sfx = new SoundEffects();
+
+                // Game state
+                this.state = 'START'; // 'START', 'PLAYING', 'VICTORY', 'GAMEOVER'
+                this.health = CONFIG.MAX_HEALTH;
+                this.crystalsCollected = 0;
+                this.totalCrystals = CRYSTAL_LOCATIONS.length;
+                this.elapsedTime = 0;
+                this.timeOfDay = 0.22; // Start in bright pastel morning (0..1)
+                this.cameraShake = 0;
+
+                // Player physics & movement state
+                this.player = {
+                    pos: new THREE.Vector3(0, 1.5, 3.5),
+                    vel: new THREE.Vector3(0, 0, 0),
+                    rotY: Math.PI,
+                    grounded: false,
+                    coyoteTimer: 0,
+                    jumpBufferTimer: 0,
+                    jumpsRemaining: 2,
+                    dashTimer: 0,
+                    dashCooldownTimer: 0,
+                    dashDir: new THREE.Vector3(0, 0, -1),
+                    invulnTimer: 0,
+                    lastSafePos: new THREE.Vector3(0, 1.5, 3.5),
+                    walkCycle: 0,
+                    squashY: 1.0
+                };
+
+                // Camera orbit state
+                this.cameraState = {
+                    yaw: 0,
+                    pitch: 0.42,
+                    distance: 11.5,
+                    currentPos: new THREE.Vector3(0, 6, 14),
+                    currentLookAt: new THREE.Vector3(0, 2, 0),
+                    isDragging: false,
+                    lastPointerX: 0,
+                    lastPointerY: 0
+                };
+
+                // Input state
+                this.keys = {};
+                this.joystickInput = { x: 0, z: 0 };
+
+                // Collections for dynamic world objects
+                this.platforms = [];
+                this.crystals = [];
+                this.turrets = [];
+                this.projectiles = [];
+                this.burstParticles = [];
+                this.ambientClouds = [];
+
+                this.initThree();
+                this.initLightsAndSky();
+                this.buildWorld();
+                this.buildWizardCharacter();
+                this.initAmbientParticles();
+                this.bindEvents();
+                this.updateHUD();
+
+                this.clock = new THREE.Clock();
+            }
+
+            // Initialize Three.js Renderer, Scene, and Camera
+            initThree() {
+                this.renderer = new THREE.WebGLRenderer({
+                    canvas: this.canvas,
+                    antialias: true,
+                    powerPreference: 'high-performance'
+                });
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = 1.08;
+
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0xbde0fe);
+                this.scene.fog = new THREE.FogExp2(0xbde0fe, 0.0085);
+
+                this.camera = new THREE.PerspectiveCamera(
+                    55,
+                    window.innerWidth / window.innerHeight,
+                    0.1,
+                    260
+                );
+            }
+
+            // Initialize Dynamic Day-Night Lighting & Starry Sky Dome
+            initLightsAndSky() {
+                // Hemisphere light for soft pastel sky/ground bounce
+                this.hemiLight = new THREE.HemisphereLight(0xfff1f2, 0xcbd5e1, 0.85);
+                this.scene.add(this.hemiLight);
+
+                // Main directional sun/moon light with soft shadows
+                this.sunLight = new THREE.DirectionalLight(0xfff7ed, 1.15);
+                this.sunLight.position.set(30, 50, 25);
+                this.sunLight.castShadow = true;
+                this.sunLight.shadow.mapSize.width = 2048;
+                this.sunLight.shadow.mapSize.height = 2048;
+                this.sunLight.shadow.camera.near = 5;
+                this.sunLight.shadow.camera.far = 150;
+                const d = 48;
+                this.sunLight.shadow.camera.left = -d;
+                this.sunLight.shadow.camera.right = d;
+                this.sunLight.shadow.camera.top = d;
+                this.sunLight.shadow.camera.bottom = -d;
+                this.sunLight.shadow.bias = -0.0005;
+                this.scene.add(this.sunLight);
+
+                // Subtle rim light for low-poly facet definition
+                this.rimLight = new THREE.DirectionalLight(0xf5d0fe, 0.45);
+                this.rimLight.position.set(-25, 18, -30);
+                this.scene.add(this.rimLight);
+
+                // Glowing Sun & Moon Orbs in the sky
+                const sunGeo = new THREE.SphereGeometry(3.8, 16, 16);
+                const sunMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+                this.sunOrb = new THREE.Mesh(sunGeo, sunMat);
+                this.scene.add(this.sunOrb);
+
+                const moonGeo = new THREE.SphereGeometry(2.8, 16, 16);
+                const moonMat = new THREE.MeshBasicMaterial({ color: 0xe0e7ff });
+                this.moonOrb = new THREE.Mesh(moonGeo, moonMat);
+                this.scene.add(this.moonOrb);
+
+                // Starfield dome (fades in during dusk/night)
+                const starCount = 450;
+                const starPositions = new Float32Array(starCount * 3);
+                for (let i = 0; i < starCount; i++) {
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(Math.random() * 0.85); // Upper hemisphere
+                    const radius = 135;
+                    starPositions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+                    starPositions[i * 3 + 1] = radius * Math.cos(phi) + 10;
+                    starPositions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
+                }
+                const starGeo = new THREE.BufferGeometry();
+                starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+                this.starMat = new THREE.PointsMaterial({
+                    color: 0xffffff,
+                    size: 1.4,
+                    transparent: true,
+                    opacity: 0.0
+                });
+                this.starField = new THREE.Points(starGeo, this.starMat);
+                this.scene.add(this.starField);
+            }
+
+            // Build the Low-Poly Floating Island Archipelago, Crystals & Elemental Turrets
+            buildWorld() {
+                // Build Islands & Stepping Stones
+                ISLAND_LAYOUT.forEach((data, idx) => {
+                    const group = new THREE.Group();
+                    group.position.set(data.x, data.y, data.z);
+
+                    // Top Turf Layer (Low-poly beveled feel)
+                    const topHeight = 0.55;
+                    const topGeo = new THREE.BoxGeometry(data.w, topHeight, data.d);
+                    const topMat = new THREE.MeshStandardMaterial({
+                        color: data.topColor,
+                        roughness: 0.72,
+                        metalness: 0.05,
+                        flatShading: true
+                    });
+                    const topMesh = new THREE.Mesh(topGeo, topMat);
+                    topMesh.position.y = data.h / 2 - topHeight / 2;
+                    topMesh.receiveShadow = true;
+                    topMesh.castShadow = true;
+                    group.add(topMesh);
+
+                    // Upper Rock Crust
+                    const crustH = data.h - topHeight;
+                    const crustGeo = new THREE.BoxGeometry(data.w * 0.94, crustH, data.d * 0.94);
+                    const crustMat = new THREE.MeshStandardMaterial({
+                        color: data.rockColor,
+                        roughness: 0.85,
+                        flatShading: true
+                    });
+                    const crustMesh = new THREE.Mesh(crustGeo, crustMat);
+                    crustMesh.position.y = -topHeight / 2;
+                    crustMesh.receiveShadow = true;
+                    crustMesh.castShadow = true;
+                    group.add(crustMesh);
+
+                    // Tapered Low-Poly Floating Island Underside Cone/Pyramid
+                    const spireDepth = data.isStep ? data.w * 0.65 : Math.min(data.w, data.d) * 0.72;
+                    const coneGeo = new THREE.ConeGeometry(Math.min(data.w, data.d) * 0.62, spireDepth, 6);
+                    coneGeo.rotateX(Math.PI);
+                    coneGeo.rotateY(idx * 0.7);
+                    const coneMesh = new THREE.Mesh(coneGeo, crustMat);
+                    coneMesh.position.y = -data.h / 2 - spireDepth / 2 + 0.1;
+                    coneMesh.castShadow = true;
+                    group.add(coneMesh);
+
+                    // Add Decorative Low-Poly Trees & Crystals on main islands
+                    if (data.trees) {
+                        const foliageColors = [PALETTE.foliagePink, PALETTE.foliageMint, PALETTE.foliageGold];
+                        for (let t = 0; t < data.trees; t++) {
+                            const angle = (t / data.trees) * Math.PI * 2 + idx;
+                            const distX = (data.w * 0.34) * Math.cos(angle);
+                            const distZ = (data.d * 0.34) * Math.sin(angle);
+                            const tree = this.createLowPolyTree(foliageColors[(t + idx) % foliageColors.length]);
+                            tree.position.set(distX, data.h / 2, distZ);
+                            group.add(tree);
+                        }
+                    }
+
+                    // Add glowing lantern posts on safe spawn islands
+                    if (data.isSafeSpawn) {
+                        const lantern = this.createPastelLantern();
+                        lantern.position.set(-data.w * 0.36, data.h / 2, data.d * 0.36);
+                        group.add(lantern);
+                    }
+
+                    this.scene.add(group);
+
+                    // Register platform AABB for crisp collision detection
+                    this.platforms.push({
+                        minX: data.x - data.w / 2,
+                        maxX: data.x + data.w / 2,
+                        minY: data.y - data.h / 2,
+                        maxY: data.y + data.h / 2,
+                        minZ: data.z - data.d / 2,
+                        maxZ: data.z + data.d / 2,
+                        isSafeSpawn: !!data.isSafeSpawn,
+                        safePoint: new THREE.Vector3(data.x, data.y + data.h / 2 + 0.2, data.z),
+                        mesh: group,
+                        baseY: data.y,
+                        bobOffset: idx * 0.85,
+                        isStep: !!data.isStep
+                    });
+                });
+
+                // Build Distant Decorative Floating Background Clouds & Mini-Isles
+                const cloudMat = new THREE.MeshStandardMaterial({
+                    color: 0xffffff,
+                    roughness: 0.9,
+                    flatShading: true
+                });
+                for (let i = 0; i < 18; i++) {
+                    const cloudGroup = new THREE.Group();
+                    const puffs = 3 + (i % 3);
+                    for (let p = 0; p < puffs; p++) {
+                        const puffGeo = new THREE.DodecahedronGeometry(1.8 + (p % 2) * 0.9, 0);
+                        const puff = new THREE.Mesh(puffGeo, cloudMat);
+                        puff.position.set((p - 1) * 1.9, (p % 2) * 0.5, (p % 3 - 1) * 0.8);
+                        cloudGroup.add(puff);
+                    }
+                    const angle = (i / 18) * Math.PI * 2;
+                    const radius = 48 + (i % 4) * 14;
+                    cloudGroup.position.set(
+                        Math.cos(angle) * radius,
+                        -6 + (i % 5) * 5.5,
+                        Math.sin(angle) * radius
+                    );
+                    this.scene.add(cloudGroup);
+                    this.ambientClouds.push({
+                        mesh: cloudGroup,
+                        speed: 0.015 + (i % 4) * 0.006,
+                        angle: angle,
+                        radius: radius
+                    });
+                }
+
+                // Spawn Glowing Crystal Artifacts
+                this.spawnCrystals();
+
+                // Spawn Automated Elemental Turrets
+                this.spawnTurrets();
+            }
+
+            createLowPolyTree(foliageColor) {
+                const tree = new THREE.Group();
+
+                const trunkGeo = new THREE.CylinderGeometry(0.16, 0.26, 1.3, 5);
+                const trunkMat = new THREE.MeshStandardMaterial({
+                    color: PALETTE.trunkWood,
+                    roughness: 0.9,
+                    flatShading: true
+                });
+                const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+                trunk.position.y = 0.65;
+                trunk.castShadow = true;
+                tree.add(trunk);
+
+                const crownMat = new THREE.MeshStandardMaterial({
+                    color: foliageColor,
+                    roughness: 0.65,
+                    flatShading: true
+                });
+
+                const crown1 = new THREE.Mesh(new THREE.DodecahedronGeometry(1.05, 0), crownMat);
+                crown1.position.y = 1.85;
+                crown1.castShadow = true;
+                tree.add(crown1);
+
+                const crown2 = new THREE.Mesh(new THREE.DodecahedronGeometry(0.72, 0), crownMat);
+                crown2.position.set(0.45, 2.35, 0.2);
+                crown2.castShadow = true;
+                tree.add(crown2);
+
+                return tree;
+            }
+
+            createPastelLantern() {
+                const lantern = new THREE.Group();
+                const postMat = new THREE.MeshStandardMaterial({ color: 0x64748b, flatShading: true });
+                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 1.9, 5), postMat);
+                post.position.y = 0.95;
+                post.castShadow = true;
+                lantern.add(post);
+
+                const bulbMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+                const bulb = new THREE.Mesh(new THREE.OctahedronGeometry(0.26, 0), bulbMat);
+                bulb.position.y = 2.05;
+                lantern.add(bulb);
+
+                return lantern;
+            }
+
+            spawnCrystals() {
+                // Clear existing if restarting
+                this.crystals.forEach(c => this.scene.remove(c.group));
+                this.crystals = [];
+
+                CRYSTAL_LOCATIONS.forEach((loc, idx) => {
+                    const group = new THREE.Group();
+                    group.position.set(loc.x, loc.y, loc.z);
+
+                    // Inner radiant core
+                    const coreGeo = new THREE.OctahedronGeometry(0.55, 0);
+                    coreGeo.scale(0.85, 1.45, 0.85);
+                    const coreMat = new THREE.MeshStandardMaterial({
+                        color: 0x38bdf8,
+                        emissive: 0xe879f9,
+                        emissiveIntensity: 0.75,
+                        roughness: 0.2,
+                        metalness: 0.3,
+                        flatShading: true
+                    });
+                    const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+                    coreMesh.castShadow = true;
+                    group.add(coreMesh);
+
+                    // Outer spinning halo ring
+                    const ringGeo = new THREE.TorusGeometry(0.82, 0.045, 6, 16);
+                    const ringMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+                    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+                    ringMesh.rotation.x = Math.PI / 3;
+                    group.add(ringMesh);
+
+                    // Ground pedestal glow disc
+                    const discGeo = new THREE.CylinderGeometry(0.65, 0.75, 0.12, 8);
+                    const discMat = new THREE.MeshStandardMaterial({
+                        color: 0xffffff,
+                        emissive: 0xa5f3fc,
+                        emissiveIntensity: 0.4,
+                        flatShading: true
+                    });
+                    const disc = new THREE.Mesh(discGeo, discMat);
+                    disc.position.y = -1.1;
+                    group.add(disc);
+
+                    this.scene.add(group);
+                    this.crystals.push({
+                        group,
+                        coreMesh,
+                        ringMesh,
+                        basePos: new THREE.Vector3(loc.x, loc.y, loc.z),
+                        collected: false,
+                        phase: idx * 0.9
+                    });
+                });
+            }
+
+            spawnTurrets() {
+                this.turrets.forEach(t => this.scene.remove(t.group));
+                this.turrets = [];
+
+                const elementColors = {
+                    fire: { base: 0xfda4af, crystal: 0xf43f5e, emissive: 0xfb7185, proj: 0xff6b6b },
+                    frost: { base: 0xbae6fd, crystal: 0x0ea5e9, emissive: 0x38bdf8, proj: 0x7dd3fc },
+                    arcane: { base: 0xe9d5ff, crystal: 0x9333ea, emissive: 0xc084fc, proj: 0xd8b4fe }
+                };
+
+                TURRET_LOCATIONS.forEach((cfg, idx) => {
+                    const colors = elementColors[cfg.element];
+                    const group = new THREE.Group();
+                    group.position.set(cfg.x, cfg.y, cfg.z);
+
+                    // Stone Pedestal
+                    const pedGeo = new THREE.CylinderGeometry(0.65, 0.85, 1.1, 6);
+                    const pedMat = new THREE.MeshStandardMaterial({
+                        color: colors.base,
+                        roughness: 0.7,
+                        flatShading: true
+                    });
+                    const ped = new THREE.Mesh(pedGeo, pedMat);
+                    ped.position.y = 0.55;
+                    ped.castShadow = true;
+                    ped.receiveShadow = true;
+                    group.add(ped);
+
+                    // Rotating Turret Head
+                    const headGroup = new THREE.Group();
+                    headGroup.position.y = 1.45;
+
+                    const orbGeo = new THREE.OctahedronGeometry(0.52, 0);
+                    const orbMat = new THREE.MeshStandardMaterial({
+                        color: colors.crystal,
+                        emissive: colors.emissive,
+                        emissiveIntensity: 0.65,
+                        flatShading: true
+                    });
+                    const orbMesh = new THREE.Mesh(orbGeo, orbMat);
+                    orbMesh.castShadow = true;
+                    headGroup.add(orbMesh);
+
+                    // Barrel pointer
+                    const barrelGeo = new THREE.ConeGeometry(0.22, 0.65, 5);
+                    barrelGeo.rotateX(Math.PI / 2);
+                    const barrelMesh = new THREE.Mesh(barrelGeo, pedMat);
+                    barrelMesh.position.z = 0.58;
+                    headGroup.add(barrelMesh);
+
+                    group.add(headGroup);
+                    this.scene.add(group);
+
+                    this.turrets.push({
+                        group,
+                        headGroup,
+                        orbMesh,
+                        pos: new THREE.Vector3(cfg.x, cfg.y + 1.45, cfg.z),
+                        element: cfg.element,
+                        projColor: colors.proj,
+                        range: cfg.range,
+                        cooldown: cfg.cooldown,
+                        timer: 0.8 + (idx % 3) * 0.5,
+                        charging: false
+                    });
+                });
+            }
+
+            // Build Procedural Low-Poly Wizard Character Rig
+            buildWizardCharacter() {
+                this.wizardGroup = new THREE.Group();
+
+                // Inner scale container for squash-and-stretch animations
+                this.wizardRig = new THREE.Group();
+                this.wizardGroup.add(this.wizardRig);
+
+                // Wizard Robe (Pastel Indigo/Violet Cone)
+                const robeGeo = new THREE.ConeGeometry(0.56, 1.25, 7);
+                const robeMat = new THREE.MeshStandardMaterial({
+                    color: 0x7c3aed,
+                    roughness: 0.6,
+                    flatShading: true
+                });
+                const robe = new THREE.Mesh(robeGeo, robeMat);
+                robe.position.y = 0.65;
+                robe.castShadow = true;
+                this.wizardRig.add(robe);
+
+                // Pastel Gold Collar Trim
+                const collarGeo = new THREE.TorusGeometry(0.3, 0.07, 5, 8);
+                collarGeo.rotateX(Math.PI / 2);
+                const goldMat = new THREE.MeshStandardMaterial({
+                    color: 0xfde047,
+                    roughness: 0.4,
+                    flatShading: true
+                });
+                const collar = new THREE.Mesh(collarGeo, goldMat);
+                collar.position.y = 1.18;
+                this.wizardRig.add(collar);
+
+                // Wizard Head
+                const headGeo = new THREE.DodecahedronGeometry(0.32, 0);
+                const headMat = new THREE.MeshStandardMaterial({
+                    color: 0xffedd5,
+                    roughness: 0.5,
+                    flatShading: true
+                });
+                const head = new THREE.Mesh(headGeo, headMat);
+                head.position.y = 1.42;
+                head.castShadow = true;
+                this.wizardRig.add(head);
+
+                // Glowing Wizard Eyes
+                const eyeMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+                const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 6), eyeMat);
+                leftEye.position.set(-0.11, 1.44, 0.27);
+                const rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 6), eyeMat);
+                rightEye.position.set(0.11, 1.44, 0.27);
+                this.wizardRig.add(leftEye, rightEye);
+
+                // Pointy Wizard Hat
+                const hatGroup = new THREE.Group();
+                hatGroup.position.set(0, 1.65, 0);
+
+                const brimGeo = new THREE.CylinderGeometry(0.62, 0.65, 0.08, 8);
+                const hatMat = new THREE.MeshStandardMaterial({
+                    color: 0x6d28d9,
+                    roughness: 0.6,
+                    flatShading: true
+                });
+                const brim = new THREE.Mesh(brimGeo, hatMat);
+                brim.castShadow = true;
+                hatGroup.add(brim);
+
+                const hatBand = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.34, 0.36, 0.14, 8),
+                    goldMat
+                );
+                hatBand.position.y = 0.09;
+                hatGroup.add(hatBand);
+
+                const hatCone = new THREE.Mesh(
+                    new THREE.ConeGeometry(0.34, 0.85, 7),
+                    hatMat
+                );
+                hatCone.position.set(0, 0.5, -0.05);
+                hatCone.rotation.x = -0.18;
+                hatCone.castShadow = true;
+                hatGroup.add(hatCone);
+
+                this.wizardRig.add(hatGroup);
+
+                // Arcane Staff in Right Hand
+                this.staffGroup = new THREE.Group();
+                this.staffGroup.position.set(0.56, 0.85, 0.25);
+
+                const shaftGeo = new THREE.CylinderGeometry(0.04, 0.05, 1.65, 5);
+                const shaftMat = new THREE.MeshStandardMaterial({
+                    color: 0xd97706,
+                    roughness: 0.7,
+                    flatShading: true
+                });
+                const shaft = new THREE.Mesh(shaftGeo, shaftMat);
+                this.staffGroup.add(shaft);
+
+                const gemGeo = new THREE.OctahedronGeometry(0.18, 0);
+                const gemMat = new THREE.MeshStandardMaterial({
+                    color: 0x22d3ee,
+                    emissive: 0x22d3ee,
+                    emissiveIntensity: 0.9,
+                    flatShading: true
+                });
+                this.staffGem = new THREE.Mesh(gemGeo, gemMat);
+                this.staffGem.position.y = 0.95;
+                this.staffGroup.add(this.staffGem);
+
+                this.wizardRig.add(this.staffGroup);
+
+                // Soft ground shadow ring directly below wizard for clear platforming depth perception
+                const indicatorGeo = new THREE.RingGeometry(0.28, 0.45, 16);
+                indicatorGeo.rotateX(-Math.PI / 2);
+                const indicatorMat = new THREE.MeshBasicMaterial({
+                    color: 0x38bdf8,
+                    transparent: true,
+                    opacity: 0.55,
+                    side: THREE.DoubleSide
+                });
+                this.groundShadowIndicator = new THREE.Mesh(indicatorGeo, indicatorMat);
+                this.scene.add(this.groundShadowIndicator);
+
+                this.scene.add(this.wizardGroup);
+            }
+
+            // Initialize Ambient Floating Pastel Sparkles / Petals
+            initAmbientParticles() {
+                const count = 260;
+                const positions = new Float32Array(count * 3);
+                const colors = new Float32Array(count * 3);
+
+                const palette = [
+                    new THREE.Color(0xfef08a),
+                    new THREE.Color(0xf9a8d4),
+                    new THREE.Color(0xa5f3fc),
+                    new THREE.Color(0xd8b4fe)
+                ];
+
+                for (let i = 0; i < count; i++) {
+                    positions[i * 3] = (Math.random() - 0.5) * 90;
+                    positions[i * 3 + 1] = Math.random() * 26 - 4;
+                    positions[i * 3 + 2] = (Math.random() - 0.5) * 90;
+
+                    const c = palette[i % palette.length];
+                    colors[i * 3] = c.r;
+                    colors[i * 3 + 1] = c.g;
+                    colors[i * 3 + 2] = c.b;
+                }
+
+                const geo = new THREE.BufferGeometry();
+                geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+                const mat = new THREE.PointsMaterial({
+                    size: 0.42,
+                    vertexColors: true,
+                    transparent: true,
+                    opacity: 0.85
+                });
+
+                this.ambientParticles = new THREE.Points(geo, mat);
+                this.scene.add(this.ambientParticles);
+            }
+
+            // Spawn Burst Particles (jumps, crystal pickups, turret hits)
+            spawnBurst(pos, colorHex, count = 14, speed = 5.5) {
+                const geo = new THREE.OctahedronGeometry(0.14, 0);
+                const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+
+                for (let i = 0; i < count; i++) {
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.position.copy(pos);
+
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.random() * Math.PI;
+                    const spd = speed * (0.45 + Math.random() * 0.75);
+
+                    const vel = new THREE.Vector3(
+                        Math.sin(phi) * Math.cos(theta) * spd,
+                        Math.abs(Math.cos(phi)) * spd + 1.5,
+                        Math.sin(phi) * Math.sin(theta) * spd
+                    );
+
+                    this.scene.add(mesh);
+                    this.burstParticles.push({
+                        mesh,
+                        vel,
+                        life: 0.45 + Math.random() * 0.35,
+                        maxLife: 0.8
+                    });
+                }
+            }
+
+            // Bind Keyboard, Mouse Drag, Touch & UI Events
+            bindEvents() {
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+
+                // Keyboard Controls
+                window.addEventListener('keydown', (e) => {
+                    this.keys[e.code] = true;
+
+                    if (this.state === 'PLAYING') {
+                        if (e.code === 'Space') {
+                            e.preventDefault();
+                            this.player.jumpBufferTimer = 0.14;
+                        }
+                        if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+                            this.triggerDash();
+                        }
+                    }
+                });
+
+                window.addEventListener('keyup', (e) => {
+                    this.keys[e.code] = false;
+                });
+
+                // Mouse Drag Camera Orbit
+                this.canvas.addEventListener('mousedown', (e) => {
+                    this.sfx.init();
+                    this.cameraState.isDragging = true;
+                    this.cameraState.lastPointerX = e.clientX;
+                    this.cameraState.lastPointerY = e.clientY;
+                });
+
+                window.addEventListener('mousemove', (e) => {
+                    if (!this.cameraState.isDragging) return;
+                    const dx = e.clientX - this.cameraState.lastPointerX;
+                    const dy = e.clientY - this.cameraState.lastPointerY;
+                    this.cameraState.lastPointerX = e.clientX;
+                    this.cameraState.lastPointerY = e.clientY;
+
+                    this.cameraState.yaw -= dx * 0.0068;
+                    this.cameraState.pitch = Math.max(
+                        0.12,
+                        Math.min(1.18, this.cameraState.pitch + dy * 0.0055)
+                    );
+                });
+
+                window.addEventListener('mouseup', () => {
+                    this.cameraState.isDragging = false;
+                });
+
+                // Mouse Wheel Zoom
+                this.canvas.addEventListener('wheel', (e) => {
+                    this.cameraState.distance = Math.max(
+                        6.5,
+                        Math.min(20.0, this.cameraState.distance + e.deltaY * 0.008)
+                    );
+                }, { passive: true });
+
+                // Touch Camera Orbit on Canvas
+                let cameraTouchId = null;
+                this.canvas.addEventListener('touchstart', (e) => {
+                    this.sfx.init();
+                    if (cameraTouchId === null && e.changedTouches.length > 0) {
+                        const t = e.changedTouches[0];
+                        cameraTouchId = t.identifier;
+                        this.cameraState.lastPointerX = t.clientX;
+                        this.cameraState.lastPointerY = t.clientY;
+                    }
+                }, { passive: true });
+
+                this.canvas.addEventListener('touchmove', (e) => {
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        const t = e.changedTouches[i];
+                        if (t.identifier === cameraTouchId) {
+                            const dx = t.clientX - this.cameraState.lastPointerX;
+                            const dy = t.clientY - this.cameraState.lastPointerY;
+                            this.cameraState.lastPointerX = t.clientX;
+                            this.cameraState.lastPointerY = t.clientY;
+
+                            this.cameraState.yaw -= dx * 0.0075;
+                            this.cameraState.pitch = Math.max(
+                                0.14,
+                                Math.min(1.15, this.cameraState.pitch + dy * 0.006)
+                            );
+                        }
+                    }
+                }, { passive: true });
+
+                const endCameraTouch = (e) => {
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        if (e.changedTouches[i].identifier === cameraTouchId) {
+                            cameraTouchId = null;
+                        }
+                    }
+                };
+                this.canvas.addEventListener('touchend', endCameraTouch);
+                this.canvas.addEventListener('touchcancel', endCameraTouch);
+
+                // Mobile Virtual Joystick
+                const joyZone = document.getElementById('joystick-zone');
+                const joyKnob = document.getElementById('joystick-knob');
+                let joyTouchId = null;
+
+                const updateJoystick = (clientX, clientY) => {
+                    const rect = joyZone.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    const maxRadius = rect.width / 2 - 16;
+
+                    let dx = clientX - centerX;
+                    let dy = clientY - centerY;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > maxRadius) {
+                        dx = (dx / dist) * maxRadius;
+                        dy = (dy / dist) * maxRadius;
+                    }
+
+                    joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                    this.joystickInput.x = dx / maxRadius;
+                    this.joystickInput.z = dy / maxRadius;
+                };
+
+                joyZone.addEventListener('touchstart', (e) => {
+                    e.stopPropagation();
+                    this.sfx.init();
+                    if (e.changedTouches.length > 0) {
+                        const t = e.changedTouches[0];
+                        joyTouchId = t.identifier;
+                        updateJoystick(t.clientX, t.clientY);
+                    }
+                });
+
+                joyZone.addEventListener('touchmove', (e) => {
+                    e.stopPropagation();
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        const t = e.changedTouches[i];
+                        if (t.identifier === joyTouchId) {
+                            updateJoystick(t.clientX, t.clientY);
+                        }
+                    }
+                });
+
+                const resetJoystick = (e) => {
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        if (e.changedTouches[i].identifier === joyTouchId) {
+                            joyTouchId = null;
+                            joyKnob.style.transform = 'translate(-50%, -50%)';
+                            this.joystickInput.x = 0;
+                            this.joystickInput.z = 0;
+                        }
+                    }
+                };
+                joyZone.addEventListener('touchend', resetJoystick);
+                joyZone.addEventListener('touchcancel', resetJoystick);
+
+                // Mobile Jump & Dash Buttons
+                document.getElementById('touch-jump').addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.sfx.init();
+                    if (this.state === 'PLAYING') {
+                        this.player.jumpBufferTimer = 0.14;
+                    }
+                });
+
+                document.getElementById('touch-dash').addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.sfx.init();
+                    if (this.state === 'PLAYING') {
+                        this.triggerDash();
+                    }
+                });
+
+                // UI Buttons
+                document.getElementById('btn-start').addEventListener('click', () => {
+                    this.sfx.init();
+                    document.getElementById('start-modal').classList.add('hidden');
+                    this.state = 'PLAYING';
+                    this.showToast('✨', 'Collect all 8 Crystal Artifacts!');
+                });
+
+                document.getElementById('btn-restart').addEventListener('click', () => {
+                    this.sfx.init();
+                    this.resetGame();
+                });
+
+                document.getElementById('btn-audio').addEventListener('click', () => {
+                    const muted = this.sfx.toggleMute();
+                    document.getElementById('audio-icon').textContent = muted ? '🔇' : '🔊';
+                });
+
+                document.getElementById('btn-time').addEventListener('click', () => {
+                    // Advance time by 1/4 cycle so player can view morning, sunset, night, dawn
+                    this.timeOfDay = (this.timeOfDay + 0.25) % 1.0;
+                });
+
+                document.getElementById('btn-help').addEventListener('click', () => {
+                    this.showToast('🧙', 'WASD: Move • Space x2: Jump • Shift: Dash • Drag: Camera');
+                });
+            }
+
+            // Reset Game State Seamlessly
+            resetGame() {
+                this.health = CONFIG.MAX_HEALTH;
+                this.crystalsCollected = 0;
+                this.elapsedTime = 0;
+                this.cameraShake = 0;
+
+                // Reset player
+                this.player.pos.set(0, 1.5, 3.5);
+                this.player.vel.set(0, 0, 0);
+                this.player.rotY = Math.PI;
+                this.player.grounded = false;
+                this.player.jumpsRemaining = 2;
+                this.player.dashTimer = 0;
+                this.player.dashCooldownTimer = 0;
+                this.player.invulnTimer = 0;
+                this.player.lastSafePos.set(0, 1.5, 3.5);
+
+                // Clear active projectiles
+                this.projectiles.forEach(p => this.scene.remove(p.mesh));
+                this.projectiles = [];
+
+                // Respawn crystals & turrets
+                this.spawnCrystals();
+                this.spawnTurrets();
+
+                // Hide end modal & resume playing
+                const endModal = document.getElementById('end-modal');
+                endModal.classList.add('hidden');
+                endModal.classList.remove('flex');
+                this.state = 'PLAYING';
+
+                this.updateHUD(true);
+                this.showToast('✨', 'New adventure started!');
+            }
+
+            triggerDash() {
+                if (this.player.dashCooldownTimer > 0 || this.player.dashTimer > 0) return;
+
+                this.player.dashTimer = CONFIG.DASH_DURATION;
+                this.player.dashCooldownTimer = CONFIG.DASH_COOLDOWN;
+
+                // Dash along current facing direction
+                this.player.dashDir.set(
+                    Math.sin(this.player.rotY),
+                    0,
+                    Math.cos(this.player.rotY)
+                ).normalize();
+
+                this.sfx.playDash();
+                this.spawnBurst(
+                    this.player.pos.clone().add(new THREE.Vector3(0, 0.9, 0)),
+                    0x38bdf8,
+                    12,
+                    5.0
+                );
+            }
+
+            // Update Day-Night Sky Colors, Sun/Moon Orbits, and Star Opacity
+            updateDayNightCycle(dt) {
+                this.timeOfDay = (this.timeOfDay + dt / CONFIG.DAY_CYCLE_SECONDS) % 1.0;
+
+                // Sun angle (0.25 = Noon, 0.5 = Sunset, 0.75 = Midnight, 0.0 = Dawn)
+                const sunAngle = (this.timeOfDay - 0.25) * Math.PI * 2;
+                const sunHeight = Math.cos(sunAngle); // +1 at noon, -1 at midnight
+                const sunX = Math.sin(sunAngle) * 65;
+                const sunY = sunHeight * 55;
+                const sunZ = 25;
+
+                this.sunOrb.position.set(sunX, sunY, sunZ);
+                this.moonOrb.position.set(-sunX, -sunY, -sunZ);
+
+                // Define key sky & lighting palettes
+                const skyDay = new THREE.Color(0xa5d8ff);
+                const skySunset = new THREE.Color(0xffafcc);
+                const skyNight = new THREE.Color(0x1e1b4b);
+
+                const fogDay = new THREE.Color(0xcaf0f8);
+                const fogSunset = new THREE.Color(0xffccd5);
+                const fogNight = new THREE.Color(0x2e1065);
+
+                const currentSky = new THREE.Color();
+                const currentFog = new THREE.Color();
+
+                let phaseIcon = '☀️';
+                let phaseName = 'Pastel Day';
+
+                if (sunHeight > 0.25) {
+                    // Full Day
+                    currentSky.copy(skyDay);
+                    currentFog.copy(fogDay);
+                    this.sunLight.intensity = 1.15;
+                    this.sunLight.color.setHex(0xfffbeb);
+                    this.hemiLight.intensity = 0.85;
+                    this.starMat.opacity = 0;
+                    phaseIcon = '☀️';
+                    phaseName = 'Pastel Day';
+                } else if (sunHeight > -0.25) {
+                    // Dawn / Dusk Transition
+                    const t = (sunHeight + 0.25) / 0.5; // 0 = night edge, 1 = day edge
+                    const sunsetFactor = 1 - Math.abs(t - 0.5) * 2;
+                    currentSky.lerpColors(skyNight, skyDay, t).lerp(skySunset, sunsetFactor * 0.75);
+                    currentFog.lerpColors(fogNight, fogDay, t).lerp(fogSunset, sunsetFactor * 0.75);
+                    this.sunLight.intensity = 0.45 + t * 0.7;
+                    this.sunLight.color.setHex(0xfda4af);
+                    this.hemiLight.intensity = 0.55 + t * 0.3;
+                    this.starMat.opacity = (1 - t) * 0.75;
+                    phaseIcon = this.timeOfDay < 0.5 ? '🌅' : '🌇';
+                    phaseName = this.timeOfDay < 0.5 ? 'Rosy Dawn' : 'Cotton Sunset';
+                } else {
+                    // Starlit Night
+                    currentSky.copy(skyNight);
+                    currentFog.copy(fogNight);
+                    this.sunLight.intensity = 0.42;
+                    this.sunLight.color.setHex(0xc7d2fe);
+                    this.hemiLight.intensity = 0.52;
+                    this.starMat.opacity = 0.9;
+                    phaseIcon = '🌙';
+                    phaseName = 'Starlit Night';
+                }
+
+                this.scene.background.copy(currentSky);
+                this.scene.fog.color.copy(currentFog);
+
+                // Position directional shadow light toward active celestial body
+                if (sunHeight >= -0.1) {
+                    this.sunLight.position.set(sunX, Math.max(15, sunY), sunZ);
+                } else {
+                    this.sunLight.position.set(-sunX, Math.max(15, -sunY), -sunZ);
+                }
+
+                // Update HUD phase pill periodically
+                const iconEl = document.getElementById('time-icon');
+                const labelEl = document.getElementById('time-label');
+                if (iconEl.textContent !== phaseIcon) {
+                    iconEl.textContent = phaseIcon;
+                    labelEl.textContent = phaseName;
+                }
+            }
+
+            // Update Player Physics, Movement, Jumping, and Responsive 3D Platform Collisions
+            updatePlayer(dt) {
+                const p = this.player;
+
+                // Timers
+                if (p.invulnTimer > 0) p.invulnTimer -= dt;
+                if (p.dashCooldownTimer > 0) p.dashCooldownTimer -= dt;
+                if (p.coyoteTimer > 0) p.coyoteTimer -= dt;
+                if (p.jumpBufferTimer > 0) p.jumpBufferTimer -= dt;
+
+                // Update Dash bar UI
+                const dashPct = Math.max(0, Math.min(100, (1 - p.dashCooldownTimer / CONFIG.DASH_COOLDOWN) * 100));
+                document.getElementById('dash-bar').style.width = `${dashPct}%`;
+
+                // Gather directional input (WASD / Arrows / Touch Joystick)
+                let moveX = this.joystickInput.x;
+                let moveZ = this.joystickInput.z;
+
+                if (this.keys['KeyW'] || this.keys['ArrowUp']) moveZ -= 1;
+                if (this.keys['KeyS'] || this.keys['ArrowDown']) moveZ += 1;
+                if (this.keys['KeyA'] || this.keys['ArrowLeft']) moveX -= 1;
+                if (this.keys['KeyD'] || this.keys['ArrowRight']) moveX += 1;
+
+                const inputMag = Math.hypot(moveX, moveZ);
+                if (inputMag > 1) {
+                    moveX /= inputMag;
+                    moveZ /= inputMag;
+                }
+
+                // Convert input relative to camera yaw angle
+                const sinYaw = Math.sin(this.cameraState.yaw);
+                const cosYaw = Math.cos(this.cameraState.yaw);
+                const worldDirX = moveX * cosYaw + moveZ * sinYaw;
+                const worldDirZ = -moveX * sinYaw + moveZ * cosYaw;
+
+                // Horizontal velocity (Dash vs Normal movement)
+                if (p.dashTimer > 0) {
+                    p.dashTimer -= dt;
+                    p.vel.x = p.dashDir.x * CONFIG.DASH_SPEED;
+                    p.vel.z = p.dashDir.z * CONFIG.DASH_SPEED;
+                    p.vel.y = 0; // Hover during dash
+                } else {
+                    const targetVx = worldDirX * CONFIG.PLAYER_SPEED;
+                    const targetVz = worldDirZ * CONFIG.PLAYER_SPEED;
+                    const accel = p.grounded ? 16.0 : 9.5;
+
+                    p.vel.x += (targetVx - p.vel.x) * Math.min(1, accel * dt);
+                    p.vel.z += (targetVz - p.vel.z) * Math.min(1, accel * dt);
+
+                    // Gravity
+                    p.vel.y -= CONFIG.GRAVITY * dt;
+                    p.vel.y = Math.max(-28, p.vel.y);
+                }
+
+                // Smoothly rotate wizard toward movement direction
+                if (inputMag > 0.08 && p.dashTimer <= 0) {
+                    const targetRot = Math.atan2(worldDirX, worldDirZ);
+                    let diff = targetRot - p.rotY;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    p.rotY += diff * Math.min(1, 14 * dt);
+                }
+
+                // Handle Buffered Jump & Double Jump
+                if (p.jumpBufferTimer > 0) {
+                    if (p.coyoteTimer > 0) {
+                        // Primary ground jump
+                        p.vel.y = CONFIG.JUMP_FORCE;
+                        p.grounded = false;
+                        p.coyoteTimer = 0;
+                        p.jumpBufferTimer = 0;
+                        p.jumpsRemaining = 1;
+                        p.squashY = 1.28;
+                        this.sfx.playJump(false);
+                        this.spawnBurst(p.pos, 0xffffff, 8, 3.2);
+                    } else if (p.jumpsRemaining > 0) {
+                        // Mid-air Arcane Double Jump
+                        p.vel.y = CONFIG.DOUBLE_JUMP_FORCE;
+                        p.jumpBufferTimer = 0;
+                        p.jumpsRemaining = 0;
+                        p.squashY = 1.25;
+                        this.sfx.playJump(true);
+                        this.spawnBurst(p.pos, 0xf472b6, 12, 4.2);
+                    }
+                }
+
+                // Apply Horizontal Movement & Resolve Wall Collisions
+                p.pos.x += p.vel.x * dt;
+                this.resolveHorizontalCollisions('x');
+
+                p.pos.z += p.vel.z * dt;
+                this.resolveHorizontalCollisions('z');
+
+                // Apply Vertical Movement & Resolve Floor/Ceiling Collisions
+                const wasGrounded = p.grounded;
+                p.grounded = false;
+                p.pos.y += p.vel.y * dt;
+                this.resolveVerticalCollisions(wasGrounded);
+
+                if (p.grounded) {
+                    p.coyoteTimer = 0.13;
+                    p.jumpsRemaining = 2;
+                }
+
+                // Check if Wizard fell below the archipelago clouds
+                if (p.pos.y < CONFIG.FALL_LIMIT_Y) {
+                    this.handlePlayerFall();
+                }
+
+                // Animate Wizard Mesh (Walk bobbing, staff spin, invulnerability blink)
+                p.squashY += (1.0 - p.squashY) * Math.min(1, 12 * dt);
+                const horizSpeed = Math.hypot(p.vel.x, p.vel.z);
+
+                if (p.grounded && horizSpeed > 0.6) {
+                    p.walkCycle += dt * horizSpeed * 1.35;
+                } else {
+                    p.walkCycle = 0;
+                }
+
+                const bobOffset = p.grounded ? Math.abs(Math.sin(p.walkCycle)) * 0.14 : 0;
+                const tiltZ = p.grounded ? Math.sin(p.walkCycle) * 0.08 : 0;
+
+                this.wizardGroup.position.set(p.pos.x, p.pos.y + bobOffset, p.pos.z);
+                this.wizardGroup.rotation.y = p.rotY;
+
+                const invSq = 1 / Math.sqrt(p.squashY);
+                this.wizardRig.scale.set(invSq, p.squashY, invSq);
+                this.wizardRig.rotation.z = tiltZ;
+                this.wizardRig.rotation.x = Math.min(0.22, horizSpeed * 0.015);
+
+                // Blink visibility during invulnerability frames
+                if (p.invulnTimer > 0) {
+                    this.wizardGroup.visible = Math.floor(p.invulnTimer * 18) % 2 === 0;
+                } else {
+                    this.wizardGroup.visible = true;
+                }
+
+                // Spin staff crystal
+                this.staffGem.rotation.y += dt * 3.0;
+                this.staffGem.rotation.x += dt * 1.5;
+
+                // Position Ground Shadow Indicator directly on nearest surface below wizard
+                this.updateGroundIndicator();
+            }
+
+            resolveHorizontalCollisions(axis) {
+                const p = this.player;
+                const r = CONFIG.PLAYER_RADIUS;
+
+                for (let i = 0; i < this.platforms.length; i++) {
+                    const box = this.platforms[i];
+                    // Check vertical overlap (allow stepping up tiny 0.25 ledges smoothly)
+                    if (p.pos.y + 0.25 < box.maxY && p.pos.y + CONFIG.PLAYER_HEIGHT > box.minY) {
+                        if (
+                            p.pos.x + r > box.minX &&
+                            p.pos.x - r < box.maxX &&
+                            p.pos.z + r > box.minZ &&
+                            p.pos.z - r < box.maxZ
+                        ) {
+                            if (axis === 'x') {
+                                if (p.vel.x > 0) p.pos.x = box.minX - r;
+                                else if (p.vel.x < 0) p.pos.x = box.maxX + r;
+                                p.vel.x = 0;
+                            } else {
+                                if (p.vel.z > 0) p.pos.z = box.minZ - r;
+                                else if (p.vel.z < 0) p.pos.z = box.maxZ + r;
+                                p.vel.z = 0;
+                            }
+                        }
+                    }
+                }
+            }
+
+            resolveVerticalCollisions(wasGrounded) {
+                const p = this.player;
+                const r = CONFIG.PLAYER_RADIUS * 0.88;
+
+                for (let i = 0; i < this.platforms.length; i++) {
+                    const box = this.platforms[i];
+                    if (
+                        p.pos.x + r > box.minX &&
+                        p.pos.x - r < box.maxX &&
+                        p.pos.z + r > box.minZ &&
+                        p.pos.z - r < box.maxZ
+                    ) {
+                        // Landing on top of a platform
+                        if (p.vel.y <= 0 && p.pos.y <= box.maxY && p.pos.y >= box.maxY - 0.85) {
+                            p.pos.y = box.maxY;
+                            if (!wasGrounded && p.vel.y < -6) {
+                                p.squashY = 0.78;
+                                this.spawnBurst(p.pos, 0xffffff, 6, 2.5);
+                            }
+                            p.vel.y = 0;
+                            p.grounded = true;
+
+                            // Record safe respawn location when standing securely on a main island
+                            if (box.isSafeSpawn) {
+                                const margin = 1.6;
+                                if (
+                                    p.pos.x > box.minX + margin &&
+                                    p.pos.x < box.maxX - margin &&
+                                    p.pos.z > box.minZ + margin &&
+                                    p.pos.z < box.maxZ - margin
+                                ) {
+                                    p.lastSafePos.set(p.pos.x, box.maxY + 0.25, p.pos.z);
+                                }
+                            }
+                        }
+                        // Hitting underside of a platform
+                        else if (
+                            p.vel.y > 0 &&
+                            p.pos.y + CONFIG.PLAYER_HEIGHT >= box.minY &&
+                            p.pos.y < box.minY
+                        ) {
+                            p.pos.y = box.minY - CONFIG.PLAYER_HEIGHT;
+                            p.vel.y = 0;
+                        }
+                    }
+                }
+            }
+
+            updateGroundIndicator() {
+                const p = this.player;
+                let highestY = -999;
+
+                for (let i = 0; i < this.platforms.length; i++) {
+                    const box = this.platforms[i];
+                    if (
+                        p.pos.x >= box.minX &&
+                        p.pos.x <= box.maxX &&
+                        p.pos.z >= box.minZ &&
+                        p.pos.z <= box.maxZ &&
+                        box.maxY <= p.pos.y + 0.1
+                    ) {
+                        if (box.maxY > highestY) highestY = box.maxY;
+                    }
+                }
+
+                if (highestY > -900) {
+                    this.groundShadowIndicator.visible = true;
+                    this.groundShadowIndicator.position.set(p.pos.x, highestY + 0.03, p.pos.z);
+                    const heightDiff = Math.max(0, p.pos.y - highestY);
+                    const scale = Math.max(0.45, 1 - heightDiff * 0.08);
+                    this.groundShadowIndicator.scale.set(scale, scale, 1);
+                } else {
+                    this.groundShadowIndicator.visible = false;
+                }
+            }
+
+            handlePlayerFall() {
+                this.damagePlayer(1, 'Fell into the clouds!');
+                if (this.state === 'PLAYING') {
+                    this.player.pos.copy(this.player.lastSafePos);
+                    this.player.vel.set(0, 0, 0);
+                    this.spawnBurst(this.player.pos, 0x38bdf8, 16, 4.5);
+                }
+            }
+
+            damagePlayer(amount, reasonText) {
+                if (this.player.invulnTimer > 0 || this.state !== 'PLAYING') return;
+
+                this.health = Math.max(0, this.health - amount);
+                this.player.invulnTimer = CONFIG.INVULN_DURATION;
+                this.cameraShake = 0.45;
+                this.sfx.playHurt();
+
+                // Flash red vignette
+                const vignette = document.getElementById('damage-vignette');
+                vignette.style.opacity = '1';
+                setTimeout(() => {
+                    vignette.style.opacity = '0';
+                }, 220);
+
+                this.updateHUD(true);
+
+                if (reasonText) {
+                    this.showToast('💥', reasonText);
+                }
+
+                if (this.health <= 0) {
+                    this.triggerEndScreen(false);
+                }
+            }
+
+            // Update Crystals, Collectibles, Nearest Crystal Compass
+            updateCrystals(dt, totalTime) {
+                let nearestDist = Infinity;
+                let nearestCrystal = null;
+
+                for (let i = 0; i < this.crystals.length; i++) {
+                    const c = this.crystals[i];
+                    if (c.collected) continue;
+
+                    // Gentle levitation and rotation
+                    c.coreMesh.rotation.y += dt * 2.1;
+                    c.ringMesh.rotation.z += dt * 1.6;
+                    c.ringMesh.rotation.y -= dt * 1.2;
+                    c.coreMesh.position.y = Math.sin(totalTime * 2.8 + c.phase) * 0.22;
+                    c.ringMesh.position.y = c.coreMesh.position.y;
+
+                    const dist = this.player.pos.distanceTo(c.basePos);
+                    if (dist < nearestDist) {
+                        nearestDist = dist;
+                        nearestCrystal = c;
+                    }
+
+                    // Collect crystal check
+                    if (dist < 1.85) {
+                        c.collected = true;
+                        c.group.visible = false;
+                        this.crystalsCollected++;
+                        this.sfx.playCollect(this.crystalsCollected);
+                        this.spawnBurst(c.basePos, 0xfef08a, 24, 6.5);
+                        this.spawnBurst(c.basePos, 0xe879f9, 16, 4.5);
+                        this.updateHUD();
+
+                        if (this.crystalsCollected >= this.totalCrystals) {
+                            this.triggerEndScreen(true);
+                        } else {
+                            this.showToast(
+                                '💎',
+                                `Crystal ${this.crystalsCollected} of ${this.totalCrystals} collected!`
+                            );
+                        }
+                    }
+                }
+
+                // Update Compass Arrow pointing toward nearest uncollected crystal
+                const arrowEl = document.getElementById('compass-arrow');
+                const distEl = document.getElementById('compass-dist');
+                if (nearestCrystal) {
+                    const dx = nearestCrystal.basePos.x - this.player.pos.x;
+                    const dz = nearestCrystal.basePos.z - this.player.pos.z;
+                    const angleToCrystal = Math.atan2(dx, dz);
+                    // Relative to camera forward direction (-sin(yaw), -cos(yaw))
+                    const camForwardAngle = this.cameraState.yaw + Math.PI;
+                    const relAngle = angleToCrystal - camForwardAngle;
+
+                    arrowEl.style.transform = `rotate(${-relAngle}rad)`;
+                    distEl.textContent = `${Math.round(nearestDist)}m`;
+                } else {
+                    distEl.textContent = 'Done!';
+                }
+            }
+
+            // Update Automated Elemental Turrets & Projectiles
+            updateTurretsAndProjectiles(dt) {
+                const wizardCenter = this.player.pos.clone().add(new THREE.Vector3(0, 1.0, 0));
+
+                // Update Turrets
+                for (let i = 0; i < this.turrets.length; i++) {
+                    const t = this.turrets[i];
+                    const dist = t.pos.distanceTo(wizardCenter);
+
+                    t.orbMesh.rotation.y += dt * 2.5;
+
+                    if (dist <= t.range && this.state === 'PLAYING') {
+                        // Rotate head smoothly toward player
+                        const dx = wizardCenter.x - t.pos.x;
+                        const dz = wizardCenter.z - t.pos.z;
+                        const targetYaw = Math.atan2(dx, dz);
+                        t.headGroup.rotation.y = targetYaw;
+
+                        t.timer -= dt;
+
+                        // Telegraph attack during final 0.55s before firing
+                        if (t.timer <= 0.55 && t.timer > 0) {
+                            const pulse = 1.0 + (0.55 - t.timer) * 0.85;
+                            t.orbMesh.scale.set(pulse, pulse, pulse);
+                        } else {
+                            t.orbMesh.scale.set(1, 1, 1);
+                        }
+
+                        if (t.timer <= 0) {
+                            t.timer = t.cooldown;
+                            t.orbMesh.scale.set(1, 1, 1);
+                            this.fireTurretProjectile(t, wizardCenter, dist);
+                        }
+                    } else {
+                        // Idle patrol sweep
+                        t.headGroup.rotation.y += dt * 0.7;
+                        t.orbMesh.scale.set(1, 1, 1);
+                    }
+                }
+
+                // Update Active Projectiles
+                for (let i = this.projectiles.length - 1; i >= 0; i--) {
+                    const proj = this.projectiles[i];
+                    proj.life -= dt;
+                    proj.mesh.position.addScaledVector(proj.vel, dt);
+                    proj.mesh.rotation.x += dt * 6;
+                    proj.mesh.rotation.y += dt * 6;
+
+                    let removeProj = proj.life <= 0;
+
+                    // Check collision with player
+                    if (!removeProj && this.state === 'PLAYING') {
+                        const hitDist = proj.mesh.position.distanceTo(wizardCenter);
+                        if (hitDist < 0.88) {
+                            removeProj = true;
+                            this.spawnBurst(proj.mesh.position, proj.color, 14, 5.0);
+
+                            // Knockback away from projectile
+                            const kb = proj.vel.clone().setY(0).normalize().multiplyScalar(8.5);
+                            this.player.vel.x += kb.x;
+                            this.player.vel.z += kb.z;
+
+                            this.damagePlayer(1, `Hit by ${proj.element} bolt!`);
+                        }
+                    }
+
+                    // Check collision with island terrain
+                    if (!removeProj) {
+                        for (let pIdx = 0; pIdx < this.platforms.length; pIdx++) {
+                            const box = this.platforms[pIdx];
+                            const pos = proj.mesh.position;
+                            if (
+                                pos.x > box.minX &&
+                                pos.x < box.maxX &&
+                                pos.y > box.minY &&
+                                pos.y < box.maxY &&
+                                pos.z > box.minZ &&
+                                pos.z < box.maxZ
+                            ) {
+                                removeProj = true;
+                                this.spawnBurst(pos, proj.color, 8, 3.5);
+                                break;
+                            }
+                        }
+                    }
+
+                    if (removeProj) {
+                        this.scene.remove(proj.mesh);
+                        this.projectiles.splice(i, 1);
+                    }
+                }
+            }
+
+            fireTurretProjectile(turret, targetPos, distToPlayer) {
+                const dir = targetPos.clone().sub(turret.pos).normalize();
+                const speed = turret.element === 'fire' ? 14.5 : turret.element === 'frost' ? 12.5 : 13.5;
+
+                const geo = new THREE.OctahedronGeometry(0.28, 0);
+                const mat = new THREE.MeshBasicMaterial({ color: turret.projColor });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.copy(turret.pos).addScaledVector(dir, 0.85);
+
+                this.scene.add(mesh);
+                this.projectiles.push({
+                    mesh,
+                    vel: dir.multiplyScalar(speed),
+                    life: 3.4,
+                    color: turret.projColor,
+                    element: turret.element
+                });
+
+                this.sfx.playTurretFire(distToPlayer);
+            }
+
+            // Update Environmental & Burst Particles + Floating Clouds
+            updateParticlesAndEnvironment(dt, totalTime) {
+                // Gentle bobbing on stepping stone platforms
+                for (let i = 0; i < this.platforms.length; i++) {
+                    const plat = this.platforms[i];
+                    if (plat.isStep) {
+                        plat.mesh.position.y = plat.baseY + Math.sin(totalTime * 1.8 + plat.bobOffset) * 0.14;
+                    }
+                }
+
+                // Drift background clouds slowly
+                for (let i = 0; i < this.ambientClouds.length; i++) {
+                    const c = this.ambientClouds[i];
+                    c.angle += c.speed * dt;
+                    c.mesh.position.x = Math.cos(c.angle) * c.radius;
+                    c.mesh.position.z = Math.sin(c.angle) * c.radius;
+                }
+
+                // Drift ambient pastel sparkles upward
+                const positions = this.ambientParticles.geometry.attributes.position.array;
+                for (let i = 0; i < positions.length; i += 3) {
+                    positions[i + 1] += dt * 0.65;
+                    positions[i] += Math.sin(totalTime + i) * dt * 0.25;
+                    if (positions[i + 1] > 24) {
+                        positions[i + 1] = -5;
+                    }
+                }
+                this.ambientParticles.geometry.attributes.position.needsUpdate = true;
+
+                // Update temporary burst particles
+                for (let i = this.burstParticles.length - 1; i >= 0; i--) {
+                    const bp = this.burstParticles[i];
+                    bp.life -= dt;
+                    bp.vel.y -= 14 * dt;
+                    bp.mesh.position.addScaledVector(bp.vel, dt);
+                    const s = Math.max(0.01, bp.life / bp.maxLife);
+                    bp.mesh.scale.set(s, s, s);
+                    bp.mesh.rotation.x += dt * 5;
+                    bp.mesh.rotation.y += dt * 5;
+
+                    if (bp.life <= 0) {
+                        this.scene.remove(bp.mesh);
+                        this.burstParticles.splice(i, 1);
+                    }
+                }
+            }
+
+            // Dynamic Third-Person Camera Follow with Smooth Lerp & Screen Shake
+            updateCamera(dt) {
+                const cs = this.cameraState;
+                const targetFocus = new THREE.Vector3(
+                    this.player.pos.x,
+                    this.player.pos.y + 1.45,
+                    this.player.pos.z
+                );
+
+                // Orbit offset from focus point
+                const horizDist = cs.distance * Math.cos(cs.pitch);
+                const vertDist = cs.distance * Math.sin(cs.pitch);
+
+                const desiredPos = new THREE.Vector3(
+                    targetFocus.x + Math.sin(cs.yaw) * horizDist,
+                    targetFocus.y + vertDist,
+                    targetFocus.z + Math.cos(cs.yaw) * horizDist
+                );
+
+                // Smooth camera follow
+                const lerpFactor = Math.min(1, 10.5 * dt);
+                cs.currentPos.lerp(desiredPos, lerpFactor);
+                cs.currentLookAt.lerp(targetFocus, Math.min(1, 14.0 * dt));
+
+                this.camera.position.copy(cs.currentPos);
+
+                // Apply trauma camera shake on hit
+                if (this.cameraShake > 0) {
+                    this.cameraShake = Math.max(0, this.cameraShake - dt * 1.8);
+                    const shakeAmt = this.cameraShake * 0.45;
+                    this.camera.position.x += (Math.random() - 0.5) * shakeAmt;
+                    this.camera.position.y += (Math.random() - 0.5) * shakeAmt;
+                    this.camera.position.z += (Math.random() - 0.5) * shakeAmt;
+                }
+
+                this.camera.lookAt(cs.currentLookAt);
+            }
+
+            // Update HUD Hearts & Crystal Counters
+            updateHUD(animateHearts = false) {
+                const heartsContainer = document.getElementById('hearts-container');
+                heartsContainer.innerHTML = '';
+
+                for (let i = 0; i < CONFIG.MAX_HEALTH; i++) {
+                    const span = document.createElement('span');
+                    span.textContent = i < this.health ? '❤️' : '🤍';
+                    span.className = `text-sm sm:text-base leading-none transition-transform ${
+                        animateHearts ? 'heart-pop' : ''
+                    }`;
+                    heartsContainer.appendChild(span);
+                }
+
+                document.getElementById('crystal-count').textContent = this.crystalsCollected;
+                document.getElementById('crystal-total').textContent = this.totalCrystals;
+            }
+
+            showToast(icon, text) {
+                const banner = document.getElementById('toast-banner');
+                document.getElementById('toast-icon').textContent = icon;
+                document.getElementById('toast-text').textContent = text;
+
+                banner.classList.remove('opacity-0', '-translate-y-2');
+                banner.classList.add('opacity-100', 'translate-y-0');
+
+                clearTimeout(this.toastTimeout);
+                this.toastTimeout = setTimeout(() => {
+                    banner.classList.remove('opacity-100', 'translate-y-0');
+                    banner.classList.add('opacity-0', '-translate-y-2');
+                }, 2200);
+            }
+
+            triggerEndScreen(isVictory) {
+                this.state = isVictory ? 'VICTORY' : 'GAMEOVER';
+
+                if (isVictory) {
+                    this.sfx.playVictory();
+                    document.getElementById('end-badge').textContent = '👑';
+                    document.getElementById('end-title').textContent = 'Archipelago Restored!';
+                    document.getElementById('end-subtitle').textContent =
+                        'You collected every crystal artifact and harmonized the floating skies!';
+                } else {
+                    this.sfx.playGameOver();
+                    document.getElementById('end-badge').textContent = '💫';
+                    document.getElementById('end-title').textContent = 'Out of Starlight';
+                    document.getElementById('end-subtitle').textContent =
+                        'The elemental guardians overwhelmed your magic. Ready to try again?';
+                }
+
+                // Format elapsed time MM:SS
+                const mins = Math.floor(this.elapsedTime / 60).toString().padStart(2, '0');
+                const secs = Math.floor(this.elapsedTime % 60).toString().padStart(2, '0');
+
+                document.getElementById('end-crystals').textContent =
+                    `${this.crystalsCollected} / ${this.totalCrystals}`;
+                document.getElementById('end-time').textContent = `${mins}:${secs}`;
+
+                const endModal = document.getElementById('end-modal');
+                endModal.classList.remove('hidden');
+                endModal.classList.add('flex');
+            }
+
+            // Main Frame Loop
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                const dt = Math.min(0.05, this.clock.getDelta());
+                const totalTime = this.clock.getElapsedTime();
+
+                this.updateDayNightCycle(dt);
+                this.updateParticlesAndEnvironment(dt, totalTime);
+
+                if (this.state === 'PLAYING') {
+                    this.elapsedTime += dt;
+                    this.updatePlayer(dt);
+                    this.updateCrystals(dt, totalTime);
+                    this.updateTurretsAndProjectiles(dt);
+                    this.updateCamera(dt);
+                } else {
+                    // Gentle scenic orbit around the wizard during Start / Victory / Game Over
+                    this.cameraState.yaw += dt * 0.22;
+                    this.updateCamera(dt);
+                }
+
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        // Start the game once the window and external libraries are loaded
+        window.onload = function () {
+            const game = new AetherIslesGame();
+            game.animate();
+        };
+    </script>
+</body>
+</html>

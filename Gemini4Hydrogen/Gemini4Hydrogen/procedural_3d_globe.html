@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Procedural 3D Globe</title>
+  <!-- Google Font: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Three.js r128 via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body
+  class="m-0 p-0 overflow-hidden bg-[#030712] text-slate-100 select-none antialiased"
+  style="font-family: 'Inter', system-ui, -apple-system, sans-serif;"
+>
+  <!-- Full-Viewport Interactive 3D WebGL Container -->
+  <div
+    id="canvas-container"
+    class="fixed inset-0 w-full h-full cursor-grab active:cursor-grabbing touch-none"
+  ></div>
+
+  <!-- Single UI Slider Overlay for Globe Continuous Rotation Speed -->
+  <div
+    id="ui-overlay"
+    class="fixed bottom-6 left-1/2 -translate-x-1/2 z-10 w-[92%] max-w-md px-5 py-3.5 rounded-full bg-slate-900/75 backdrop-blur-md border border-sky-400/25 shadow-[0_8px_32px_rgba(0,0,0,0.65)] flex items-center gap-4"
+  >
+    <label
+      for="speed-slider"
+      class="text-xs sm:text-sm font-medium tracking-wide text-sky-200/90 whitespace-nowrap"
+    >
+      Rotation Speed
+    </label>
+    <input
+      id="speed-slider"
+      type="range"
+      min="0"
+      max="4"
+      step="0.05"
+      value="1"
+      aria-label="Globe continuous rotation speed"
+      class="w-full h-1.5 bg-slate-700/90 rounded-lg appearance-none cursor-pointer accent-sky-400 focus:outline-none"
+    />
+    <span
+      id="speed-value"
+      class="text-xs sm:text-sm font-mono font-semibold text-sky-300 w-12 text-right tabular-nums"
+    >
+      1.00x
+    </span>
+  </div>
+
+  <script>
+    /**
+     * Deterministic Pseudo-Random Number Generator (Mulberry32)
+     * Produces repeatable, balanced procedural terrain and star/particle distributions.
+     */
+    function createPRNG(seed) {
+      let a = seed >>> 0;
+      return function () {
+        a |= 0;
+        a = (a + 0x6d2b79f5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    /**
+     * 3D Improved Perlin Noise & Fractal Brownian Motion (fBm)
+     * Evaluating noise in 3D unit-sphere coordinates eliminates longitudinal seams
+     * and polar pinching on equirectangular planetary textures.
+     */
+    class Noise3D {
+      constructor(seed = 42) {
+        const rand = createPRNG(seed);
+        this.perm = new Uint8Array(512);
+        const p = new Uint8Array(256);
+        for (let i = 0; i < 256; i++) {
+          p[i] = i;
+        }
+        for (let i = 255; i > 0; i--) {
+          const j = Math.floor(rand() * (i + 1));
+          const tmp = p[i];
+          p[i] = p[j];
+          p[j] = tmp;
+        }
+        for (let i = 0; i < 512; i++) {
+          this.perm[i] = p[i & 255];
+        }
+      }
+
+      fade(t) {
+        return t * t * t * (t * (t * 6 - 15) + 10);
+      }
+
+      lerp(t, a, b) {
+        return a + t * (b - a);
+      }
+
+      grad(hash, x, y, z) {
+        const h = hash & 15;
+        const u = h < 8 ? x : y;
+        const v = h < 4 ? y : h === 12 || h === 14 ? x : z;
+        return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
+      }
+
+      noise(x, y, z) {
+        const X = Math.floor(x) & 255;
+        const Y = Math.floor(y) & 255;
+        const Z = Math.floor(z) & 255;
+
+        x -= Math.floor(x);
+        y -= Math.floor(y);
+        z -= Math.floor(z);
+
+        const u = this.fade(x);
+        const v = this.fade(y);
+        const w = this.fade(z);
+
+        const p = this.perm;
+        const A = p[X] + Y;
+        const AA = p[A] + Z;
+        const AB = p[A + 1] + Z;
+        const B = p[X + 1] + Y;
+        const BA = p[B] + Z;
+        const BB = p[B + 1] + Z;
+
+        return this.lerp(
+          w,
+          this.lerp(
+            v,
+            this.lerp(u, this.grad(p[AA], x, y, z), this.grad(p[BA], x - 1, y, z)),
+            this.lerp(u, this.grad(p[AB], x, y - 1, z), this.grad(p[BB], x - 1, y - 1, z))
+          ),
+          this.lerp(
+            v,
+            this.lerp(u, this.grad(p[AA + 1], x, y, z - 1), this.grad(p[BA + 1], x - 1, y, z - 1)),
+            this.lerp(
+              u,
+              this.grad(p[AB + 1], x, y - 1, z - 1),
+              this.grad(p[BB + 1], x - 1, y - 1, z - 1)
+            )
+          )
+        );
+      }
+
+      fbm(x, y, z, octaves = 5, lacunarity = 2.05, gain = 0.5) {
+        let sum = 0;
+        let amp = 0.5;
+        let freq = 1.0;
+        let norm = 0;
+        for (let i = 0; i < octaves; i++) {
+          sum += amp * this.noise(x * freq, y * freq, z * freq);
+          norm += amp;
+          freq *= lacunarity;
+          amp *= gain;
+        }
+        return sum / norm;
+      }
+    }
+
+    /**
+     * Generates procedural equirectangular canvas textures without external image assets:
+     * 1. Diffuse Albedo Map (oceans, coastal shelves, forests, deserts, alpine ridges, polar ice)
+     * 2. Elevation Bump Map (continent relief)
+     * 3. Specular Reflection Map (sun glint on oceans vs matte terrain)
+     * 4. Atmospheric Cloud Layer Map (translucent swirling cloud bands)
+     */
+    function generatePlanetTextures(maxAnisotropy) {
+      const width = 1024;
+      const height = 512;
+
+      const diffuseCanvas = document.createElement("canvas");
+      diffuseCanvas.width = width;
+      diffuseCanvas.height = height;
+      const diffuseCtx = diffuseCanvas.getContext("2d");
+      const diffuseImg = diffuseCtx.createImageData(width, height);
+
+      const bumpCanvas = document.createElement("canvas");
+      bumpCanvas.width = width;
+      bumpCanvas.height = height;
+      const bumpCtx = bumpCanvas.getContext("2d");
+      const bumpImg = bumpCtx.createImageData(width, height);
+
+      const specCanvas = document.createElement("canvas");
+      specCanvas.width = width;
+      specCanvas.height = height;
+      const specCtx = specCanvas.getContext("2d");
+      const specImg = specCtx.createImageData(width, height);
+
+      const cloudCanvas = document.createElement("canvas");
+      cloudCanvas.width = width;
+      cloudCanvas.height = height;
+      const cloudCtx = cloudCanvas.getContext("2d");
+      const cloudImg = cloudCtx.createImageData(width, height);
+
+      const continentNoise = new Noise3D(1337);
+      const detailNoise = new Noise3D(7331);
+      const moistureNoise = new Noise3D(9001);
+      const cloudNoise = new Noise3D(2026);
+
+      const dData = diffuseImg.data;
+      const bData = bumpImg.data;
+      const sData = specImg.data;
+      const cData = cloudImg.data;
+
+      const seaLevel = 0.015;
+
+      for (let y = 0; y < height; y++) {
+        const v = y / (height - 1);
+        const phi = v * Math.PI;
+        const sinPhi = Math.sin(phi);
+        const cosPhi = Math.cos(phi);
+        const absLat = Math.abs(cosPhi); // 0 at equator, 1 at poles
+
+        for (let x = 0; x < width; x++) {
+          const u = x / width;
+          const theta = u * Math.PI * 2;
+
+          // Map equirectangular pixel to 3D unit sphere
+          const nx = -sinPhi * Math.cos(theta);
+          const ny = cosPhi;
+          const nz = sinPhi * Math.sin(theta);
+
+          // Domain warping for natural coastlines, bays, and island chains
+          const warpX = detailNoise.fbm(nx * 2.2, ny * 2.2, nz * 2.2, 3) * 0.35;
+          const warpY = detailNoise.fbm(nx * 2.2 + 5.2, ny * 2.2 + 1.3, nz * 2.2 + 8.4, 3) * 0.35;
+          const warpZ = detailNoise.fbm(nx * 2.2 + 9.1, ny * 2.2 + 4.7, nz * 2.2 + 2.8, 3) * 0.35;
+
+          const baseElevation = continentNoise.fbm(
+            (nx + warpX) * 1.65,
+            (ny + warpY) * 1.65,
+            (nz + warpZ) * 1.65,
+            5
+          );
+          const ridge = Math.abs(detailNoise.fbm(nx * 5.5, ny * 5.5, nz * 5.5, 4));
+          const elevation = baseElevation + ridge * 0.14;
+
+          const moisture = moistureNoise.fbm(nx * 2.6 + 3.1, ny * 2.6, nz * 2.6 - 1.7, 4) + 0.5;
+
+          const idx = (y * width + x) * 4;
+          let r = 0;
+          let g = 0;
+          let b = 0;
+          let bumpVal = 0;
+          let specVal = 0;
+
+          // Polar ice cap threshold modulated slightly by terrain elevation
+          const iceThreshold = 0.85 - baseElevation * 0.08;
+
+          if (absLat > iceThreshold) {
+            // Polar Ice Caps
+            r = 232;
+            g = 242;
+            b = 250;
+            bumpVal = 148;
+            specVal = 115;
+          } else if (elevation < seaLevel) {
+            // Ocean Depth Gradient
+            const depth = Math.min(1, Math.max(0, (seaLevel - elevation) / 0.48));
+            if (depth < 0.14) {
+              // Shallow coastal turquoise shelf
+              const t = depth / 0.14;
+              r = Math.round(28 * (1 - t) + 11 * t);
+              g = Math.round(128 * (1 - t) + 64 * t);
+              b = Math.round(158 * (1 - t) + 114 * t);
+            } else {
+              // Deep sapphire ocean
+              const t = (depth - 0.14) / 0.86;
+              r = Math.round(11 * (1 - t) + 4 * t);
+              g = Math.round(64 * (1 - t) + 21 * t);
+              b = Math.round(114 * (1 - t) + 52 * t);
+            }
+            bumpVal = 20;
+            specVal = 235;
+          } else {
+            // Continental Landmass Biomes
+            const landH = Math.min(1, (elevation - seaLevel) / 0.42);
+            bumpVal = Math.round(58 + landH * 197);
+            specVal = 22;
+
+            // Subtropical desert belt around ~20-35 degrees latitude
+            const desertBelt = Math.exp(-Math.pow((absLat - 0.34) / 0.14, 2));
+            const aridity = desertBelt * (1 - moisture * 0.85);
+
+            if (landH < 0.04) {
+              // Warm sandy shoreline
+              r = 188;
+              g = 176;
+              b = 134;
+            } else if (landH > 0.76) {
+              // Snow-capped alpine peaks
+              r = 236;
+              g = 241;
+              b = 247;
+              specVal = 92;
+            } else if (landH > 0.54) {
+              // High rocky mountain ridges
+              const t = (landH - 0.54) / 0.22;
+              r = Math.round(92 * (1 - t) + 134 * t);
+              g = Math.round(88 * (1 - t) + 128 * t);
+              b = Math.round(78 * (1 - t) + 120 * t);
+            } else if (aridity > 0.42) {
+              // Golden deserts & arid steppes
+              const t = Math.min(1, (aridity - 0.42) / 0.45);
+              r = Math.round(112 * (1 - t) + 198 * t);
+              g = Math.round(134 * (1 - t) + 168 * t);
+              b = Math.round(78 * (1 - t) + 108 * t);
+            } else {
+              // Lush tropical & temperate forests
+              const forestShade = Math.max(0, Math.min(1, moisture));
+              r = Math.round(64 * (1 - forestShade) + 28 * forestShade);
+              g = Math.round(118 * (1 - forestShade) + 84 * forestShade);
+              b = Math.round(62 * (1 - forestShade) + 46 * forestShade);
+            }
+          }
+
+          dData[idx] = r;
+          dData[idx + 1] = g;
+          dData[idx + 2] = b;
+          dData[idx + 3] = 255;
+
+          bData[idx] = bumpVal;
+          bData[idx + 1] = bumpVal;
+          bData[idx + 2] = bumpVal;
+          bData[idx + 3] = 255;
+
+          sData[idx] = specVal;
+          sData[idx + 1] = specVal;
+          sData[idx + 2] = specVal;
+          sData[idx + 3] = 255;
+
+          // Swirling atmospheric cloud layer
+          const swirlX = cloudNoise.fbm(nx * 2.4, ny * 2.4, nz * 2.4, 3) * 0.45;
+          const swirlZ = cloudNoise.fbm(nx * 2.4 + 4.1, ny * 2.4, nz * 2.4 + 6.3, 3) * 0.45;
+          const cVal = cloudNoise.fbm(
+            (nx + swirlX) * 3.1,
+            ny * 4.2,
+            (nz + swirlZ) * 3.1,
+            4
+          );
+          const cloudAlpha = Math.max(0, Math.min(1, (cVal - 0.03) * 3.1));
+
+          cData[idx] = 245;
+          cData[idx + 1] = 250;
+          cData[idx + 2] = 255;
+          cData[idx + 3] = Math.round(cloudAlpha * 185);
+        }
+      }
+
+      diffuseCtx.putImageData(diffuseImg, 0, 0);
+      bumpCtx.putImageData(bumpImg, 0, 0);
+      specCtx.putImageData(specImg, 0, 0);
+      cloudCtx.putImageData(cloudImg, 0, 0);
+
+      const configureTexture = (canvas) => {
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.ClampToEdgeWrapping;
+        tex.anisotropy = maxAnisotropy;
+        tex.needsUpdate = true;
+        return tex;
+      };
+
+      return {
+        diffuseTex: configureTexture(diffuseCanvas),
+        bumpTex: configureTexture(bumpCanvas),
+        specTex: configureTexture(specCanvas),
+        cloudTex: configureTexture(cloudCanvas),
+      };
+    }
+
+    /**
+     * Generates a soft radial glow sprite texture via <canvas> for light particles and stars.
+     */
+    function createParticleGlowTexture() {
+      const size = 64;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+
+      const half = size / 2;
+      const gradient = ctx.createRadialGradient(half, half, 0, half, half, half);
+      gradient.addColorStop(0.0, "rgba(255, 255, 255, 1.0)");
+      gradient.addColorStop(0.22, "rgba(210, 244, 255, 0.85)");
+      gradient.addColorStop(0.55, "rgba(96, 195, 255, 0.25)");
+      gradient.addColorStop(1.0, "rgba(0, 0, 0, 0.0)");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, size, size);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.needsUpdate = true;
+      return tex;
+    }
+
+    /**
+     * Initialize 3D Scene, Procedural Globe, Atmosphere, Particle Ring & Controls on Window Load
+     */
+    window.addEventListener("load", () => {
+      try {
+        const container = document.getElementById("canvas-container");
+        const speedSlider = document.getElementById("speed-slider");
+        const speedValue = document.getElementById("speed-value");
+        const uiOverlay = document.getElementById("ui-overlay");
+
+        // Prevent UI slider interactions from triggering canvas drag rotation or wheel zoom
+        ["pointerdown", "mousedown", "touchstart", "wheel"].forEach((evt) => {
+          uiOverlay.addEventListener(evt, (e) => e.stopPropagation(), { passive: true });
+        });
+
+        // Scene & Perspective Camera Setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(
+          45,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          100
+        );
+        let targetCameraZ = 3.25;
+        camera.position.set(0, 0.14, targetCameraZ);
+
+        // WebGL Renderer Setup
+        const renderer = new THREE.WebGLRenderer({
+          antialias: true,
+          powerPreference: "high-performance",
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.setClearColor(0x030712, 1);
+        container.appendChild(renderer.domElement);
+
+        // Three-Point / Celestial Lighting Setup
+        const sunDirection = new THREE.Vector3(5, 2.6, 4.5).normalize();
+        const sunLight = new THREE.DirectionalLight(0xfff8ee, 1.55);
+        sunLight.position.copy(sunDirection).multiplyScalar(10);
+        scene.add(sunLight);
+
+        const rimLight = new THREE.DirectionalLight(0x2868a8, 0.35);
+        rimLight.position.set(-6, -2, -5);
+        scene.add(rimLight);
+
+        const ambientLight = new THREE.AmbientLight(0x16243d, 0.55);
+        scene.add(ambientLight);
+
+        // Generate Procedural Canvas Textures
+        const maxAnisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8);
+        const { diffuseTex, bumpTex, specTex, cloudTex } = generatePlanetTextures(maxAnisotropy);
+        const glowSpriteTex = createParticleGlowTexture();
+
+        // Master Globe Pivot Group (controlled by continuous spin + user drag rotation)
+        const globePivot = new THREE.Group();
+        globePivot.rotation.x = 0.18;
+        scene.add(globePivot);
+
+        // 1. Procedural Globe Sphere Mesh
+        const globeGeometry = new THREE.SphereGeometry(1, 96, 96);
+        const globeMaterial = new THREE.MeshPhongMaterial({
+          map: diffuseTex,
+          bumpMap: bumpTex,
+          bumpScale: 0.022,
+          specularMap: specTex,
+          specular: new THREE.Color(0x4b89b8),
+          shininess: 26,
+        });
+        const globeMesh = new THREE.Mesh(globeGeometry, globeMaterial);
+        globePivot.add(globeMesh);
+
+        // 2. Translucent Cloud Layer Sphere
+        const cloudGeometry = new THREE.SphereGeometry(1.013, 72, 72);
+        const cloudMaterial = new THREE.MeshLambertMaterial({
+          map: cloudTex,
+          transparent: true,
+          opacity: 0.72,
+          depthWrite: false,
+        });
+        const cloudMesh = new THREE.Mesh(cloudGeometry, cloudMaterial);
+        globePivot.add(cloudMesh);
+
+        // 3. Inner Translucent Atmospheric Limb Glow Mesh (Fresnel Scattering)
+        const innerAtmoGeometry = new THREE.SphereGeometry(1.028, 72, 72);
+        const innerAtmoMaterial = new THREE.ShaderMaterial({
+          uniforms: {
+            uSunDir: { value: sunDirection },
+            uColorDay: { value: new THREE.Color(0x38bdf8) },
+            uColorNight: { value: new THREE.Color(0x0c2d5e) },
+          },
+          vertexShader: `
+            varying vec3 vNormalView;
+            varying vec3 vNormalWorld;
+            void main() {
+              vNormalView = normalize(normalMatrix * normal);
+              vNormalWorld = normalize(mat3(modelMatrix) * normal);
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform vec3 uSunDir;
+            uniform vec3 uColorDay;
+            uniform vec3 uColorNight;
+            varying vec3 vNormalView;
+            varying vec3 vNormalWorld;
+            void main() {
+              float viewDot = clamp(dot(vNormalView, vec3(0.0, 0.0, 1.0)), 0.0, 1.0);
+              float fresnel = pow(1.0 - viewDot, 3.2);
+              float sunFactor = smoothstep(-0.35, 0.65, dot(vNormalWorld, uSunDir));
+              vec3 atmoColor = mix(uColorNight, uColorDay, sunFactor);
+              float alpha = fresnel * (0.28 + 0.62 * sunFactor);
+              gl_FragColor = vec4(atmoColor, alpha);
+            }
+          `,
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          side: THREE.FrontSide,
+        });
+        const innerAtmoMesh = new THREE.Mesh(innerAtmoGeometry, innerAtmoMaterial);
+        scene.add(innerAtmoMesh);
+
+        // 4. Outer Translucent Atmospheric Halo Mesh
+        const outerAtmoGeometry = new THREE.SphereGeometry(1.16, 72, 72);
+        const outerAtmoMaterial = new THREE.ShaderMaterial({
+          uniforms: {
+            uSunDir: { value: sunDirection },
+            uGlowColor: { value: new THREE.Color(0x38bdf8) },
+          },
+          vertexShader: `
+            varying vec3 vNormalView;
+            varying vec3 vNormalWorld;
+            void main() {
+              vNormalView = normalize(normalMatrix * normal);
+              vNormalWorld = normalize(mat3(modelMatrix) * normal);
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform vec3 uSunDir;
+            uniform vec3 uGlowColor;
+            varying vec3 vNormalView;
+            varying vec3 vNormalWorld;
+            void main() {
+              float intensity = pow(clamp(0.62 + dot(vNormalView, vec3(0.0, 0.0, 1.0)), 0.0, 1.0), 3.4);
+              float sunBoost = 0.45 + 0.55 * smoothstep(-0.4, 0.7, dot(vNormalWorld, uSunDir));
+              gl_FragColor = vec4(uGlowColor, intensity * sunBoost * 0.85);
+            }
+          `,
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          side: THREE.BackSide,
+        });
+        const outerAtmoMesh = new THREE.Mesh(outerAtmoGeometry, outerAtmoMaterial);
+        scene.add(outerAtmoMesh);
+
+        // 5. Orbiting Ring of Light Particles
+        const ringGroup = new THREE.Group();
+        ringGroup.rotation.z = 0.34; // Orbital inclination
+        ringGroup.rotation.x = 0.16;
+        globePivot.add(ringGroup);
+
+        const particleCount = 2600;
+        const ringPositions = new Float32Array(particleCount * 3);
+        const ringColors = new Float32Array(particleCount * 3);
+        const ringRand = createPRNG(8888);
+
+        const colorCyan = new THREE.Color(0x7dd3fc);
+        const colorWhite = new THREE.Color(0xf0f9ff);
+        const colorGold = new THREE.Color(0xfde68a);
+
+        for (let i = 0; i < particleCount; i++) {
+          const angle = ringRand() * Math.PI * 2;
+          // Two luminous concentric bands separated by a subtle Cassini-style division
+          const band = ringRand() < 0.62 ? 0 : 1;
+          const radius =
+            band === 0
+              ? 1.36 + ringRand() * 0.26
+              : 1.68 + ringRand() * 0.32;
+
+          // Subtle vertical ribbon thickness
+          const ySpread = (ringRand() - 0.5) * 0.024;
+
+          ringPositions[i * 3] = Math.cos(angle) * radius;
+          ringPositions[i * 3 + 1] = ySpread;
+          ringPositions[i * 3 + 2] = Math.sin(angle) * radius;
+
+          const colorPick = ringRand();
+          const c =
+            colorPick < 0.55
+              ? colorCyan
+              : colorPick < 0.85
+              ? colorWhite
+              : colorGold;
+          const brightness = 0.65 + ringRand() * 0.35;
+
+          ringColors[i * 3] = c.r * brightness;
+          ringColors[i * 3 + 1] = c.g * brightness;
+          ringColors[i * 3 + 2] = c.b * brightness;
+        }
+
+        const ringGeometry = new THREE.BufferGeometry();
+        ringGeometry.setAttribute("position", new THREE.BufferAttribute(ringPositions, 3));
+        ringGeometry.setAttribute("color", new THREE.BufferAttribute(ringColors, 3));
+
+        const ringMaterial = new THREE.PointsMaterial({
+          size: 0.028,
+          map: glowSpriteTex,
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.9,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          sizeAttenuation: true,
+        });
+
+        const ringParticles = new THREE.Points(ringGeometry, ringMaterial);
+        ringGroup.add(ringParticles);
+
+        // 6. Deep-Space Starfield Backdrop
+        const starCount = 1600;
+        const starPositions = new Float32Array(starCount * 3);
+        const starRand = createPRNG(5150);
+        for (let i = 0; i < starCount; i++) {
+          const u = starRand();
+          const v = starRand();
+          const theta = 2 * Math.PI * u;
+          const phi = Math.acos(2 * v - 1);
+          const dist = 18 + starRand() * 22;
+
+          starPositions[i * 3] = dist * Math.sin(phi) * Math.cos(theta);
+          starPositions[i * 3 + 1] = dist * Math.cos(phi);
+          starPositions[i * 3 + 2] = dist * Math.sin(phi) * Math.sin(theta);
+        }
+
+        const starGeometry = new THREE.BufferGeometry();
+        starGeometry.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
+        const starMaterial = new THREE.PointsMaterial({
+          color: 0xcbd5e1,
+          size: 0.09,
+          map: glowSpriteTex,
+          transparent: true,
+          opacity: 0.65,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const starField = new THREE.Points(starGeometry, starMaterial);
+        scene.add(starField);
+
+        // Interactive Mouse Drag Rotation, Touch & Zoom Controls
+        let isDragging = false;
+        let prevPointerX = 0;
+        let prevPointerY = 0;
+        let dragVelocityX = 0;
+        let dragVelocityY = 0;
+        let pinchStartDist = 0;
+
+        const minZoom = 1.65;
+        const maxZoom = 5.4;
+
+        function clampZoom(z) {
+          return Math.max(minZoom, Math.min(maxZoom, z));
+        }
+
+        function onPointerDown(clientX, clientY) {
+          isDragging = true;
+          prevPointerX = clientX;
+          prevPointerY = clientY;
+        }
+
+        function onPointerMove(clientX, clientY) {
+          if (!isDragging) return;
+          const deltaX = clientX - prevPointerX;
+          const deltaY = clientY - prevPointerY;
+          prevPointerX = clientX;
+          prevPointerY = clientY;
+
+          dragVelocityY = deltaX * 0.0048;
+          dragVelocityX = deltaY * 0.0048;
+        }
+
+        function onPointerUp() {
+          isDragging = false;
+        }
+
+        // Mouse Drag Rotation Events
+        container.addEventListener("mousedown", (e) => {
+          if (e.button !== 0) return;
+          onPointerDown(e.clientX, e.clientY);
+        });
+
+        window.addEventListener("mousemove", (e) => {
+          onPointerMove(e.clientX, e.clientY);
+        });
+
+        window.addEventListener("mouseup", onPointerUp);
+
+        // Mouse Wheel Zoom Control
+        container.addEventListener(
+          "wheel",
+          (e) => {
+            e.preventDefault();
+            targetCameraZ = clampZoom(targetCameraZ + e.deltaY * 0.0018);
+          },
+          { passive: false }
+        );
+
+        // Keyboard Zoom Controls (+ / - / = / _)
+        window.addEventListener("keydown", (e) => {
+          if (e.key === "+" || e.key === "=") {
+            targetCameraZ = clampZoom(targetCameraZ - 0.25);
+          } else if (e.key === "-" || e.key === "_") {
+            targetCameraZ = clampZoom(targetCameraZ + 0.25);
+          }
+        });
+
+        // Touch Events (Single-finger drag rotate & Two-finger pinch zoom)
+        container.addEventListener(
+          "touchstart",
+          (e) => {
+            if (e.touches.length === 1) {
+              onPointerDown(e.touches[0].clientX, e.touches[0].clientY);
+            } else if (e.touches.length === 2) {
+              isDragging = false;
+              const dx = e.touches[0].clientX - e.touches[1].clientX;
+              const dy = e.touches[0].clientY - e.touches[1].clientY;
+              pinchStartDist = Math.hypot(dx, dy);
+            }
+          },
+          { passive: true }
+        );
+
+        container.addEventListener(
+          "touchmove",
+          (e) => {
+            if (e.touches.length === 1 && isDragging) {
+              onPointerMove(e.touches[0].clientX, e.touches[0].clientY);
+            } else if (e.touches.length === 2 && pinchStartDist > 0) {
+              const dx = e.touches[0].clientX - e.touches[1].clientX;
+              const dy = e.touches[0].clientY - e.touches[1].clientY;
+              const currentDist = Math.hypot(dx, dy);
+              const diff = pinchStartDist - currentDist;
+              pinchStartDist = currentDist;
+
+              targetCameraZ = clampZoom(targetCameraZ + diff * 0.008);
+            }
+          },
+          { passive: true }
+        );
+
+        container.addEventListener("touchend", () => {
+          isDragging = false;
+          pinchStartDist = 0;
+        });
+
+        // Single UI Slider Overlay for Continuous Rotation Speed
+        let rotationSpeedMultiplier = parseFloat(speedSlider.value);
+        speedSlider.addEventListener("input", (e) => {
+          rotationSpeedMultiplier = parseFloat(e.target.value);
+          speedValue.textContent = `${rotationSpeedMultiplier.toFixed(2)}x`;
+        });
+
+        // Responsive Window Resize Handler
+        window.addEventListener("resize", () => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        });
+
+        // Main Animation Loop
+        let lastTime = performance.now();
+        const baseSpinRate = 0.16; // Radians per second at 1.00x
+
+        function animate(now) {
+          requestAnimationFrame(animate);
+
+          const dt = Math.min((now - lastTime) / 1000, 0.1);
+          lastTime = now;
+
+          // Apply continuous spin (controlled by slider) + interactive drag rotation
+          const continuousSpin = baseSpinRate * rotationSpeedMultiplier * dt;
+          globePivot.rotation.y += continuousSpin + dragVelocityY;
+          globePivot.rotation.x += dragVelocityX;
+
+          // Clamp vertical polar tilt
+          const maxTilt = Math.PI * 0.44;
+          globePivot.rotation.x = Math.max(-maxTilt, Math.min(maxTilt, globePivot.rotation.x));
+
+          // Smooth damping on manual drag inertia
+          if (!isDragging) {
+            dragVelocityX *= 0.92;
+            dragVelocityY *= 0.92;
+          } else {
+            dragVelocityX *= 0.5;
+            dragVelocityY *= 0.5;
+          }
+
+          // Independent subtle drift for cloud layer and orbiting light particle ring
+          cloudMesh.rotation.y += 0.025 * dt * (0.3 + rotationSpeedMultiplier * 0.7);
+          ringParticles.rotation.y -= 0.14 * dt * (0.45 + rotationSpeedMultiplier * 0.55);
+
+          // Smooth camera zoom interpolation
+          camera.position.z += (targetCameraZ - camera.position.z) * 0.12;
+
+          renderer.render(scene, camera);
+        }
+
+        requestAnimationFrame(animate);
+      } catch (err) {
+        const container = document.getElementById("canvas-container");
+        if (container) {
+          container.innerHTML =
+            '<div class="flex items-center justify-center h-full text-slate-300 text-sm p-6 text-center">Unable to initialize 3D WebGL context in this browser.</div>';
+        }
+      }
+    });
+  </script>
+</body>
+</html>

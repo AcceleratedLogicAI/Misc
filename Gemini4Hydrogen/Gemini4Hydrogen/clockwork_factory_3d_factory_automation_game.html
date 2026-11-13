@@ -1,0 +1,4663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>CLOCKWORK FACTORY — 3D Factory Automation & AI Autopilot</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Three.js r128 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Industrial Clockwork Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg-panel: rgba(11, 15, 22, 0.88);
+      --border-brass: rgba(229, 169, 76, 0.42);
+      --border-subtle: rgba(148, 163, 184, 0.18);
+      --accent-brass: #e5a94c;
+      --accent-cyan: #22d3ee;
+      --accent-emerald: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #070a10;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: #e2e8f0;
+    }
+
+    .font-display {
+      font-family: 'Chakra Petch', sans-serif;
+    }
+
+    .font-mono-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      touch-action: none;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .cw-panel {
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.58), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    .cw-panel-brass {
+      background: var(--bg-panel);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border-brass);
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(229, 169, 76, 0.16);
+    }
+
+    .cw-panel-ai {
+      background: rgba(8, 18, 28, 0.90);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(34, 211, 238, 0.48);
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.65), 0 0 24px rgba(34, 211, 238, 0.14), inset 0 1px 0 rgba(34, 211, 238, 0.22);
+    }
+
+    .build-card {
+      position: relative;
+      transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.14s ease, background-color 0.14s ease, box-shadow 0.14s ease;
+    }
+    .build-card:hover:not(.locked) {
+      transform: translateY(-4px);
+      border-color: rgba(229, 169, 76, 0.72);
+      background-color: rgba(30, 41, 59, 0.94);
+    }
+    .build-card.active {
+      transform: translateY(-5px);
+      border-color: #22d3ee;
+      background: linear-gradient(180deg, rgba(34, 211, 238, 0.20) 0%, rgba(15, 23, 42, 0.96) 100%);
+      box-shadow: 0 0 18px rgba(34, 211, 238, 0.38), inset 0 1px 0 rgba(34, 211, 238, 0.42);
+    }
+    .build-card.locked {
+      opacity: 0.46;
+      cursor: not-allowed;
+      filter: grayscale(0.75);
+    }
+
+    @keyframes spinSlow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .spin-slow {
+      animation: spinSlow 14s linear infinite;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 12px rgba(34, 211, 238, 0.35); }
+      50% { box-shadow: 0 0 24px rgba(34, 211, 238, 0.75); }
+    }
+    .ai-active-glow {
+      animation: pulseGlow 2.2s ease-in-out infinite;
+    }
+
+    @keyframes floatUpFade {
+      0% { opacity: 0; transform: translate(-50%, 6px) scale(0.92); }
+      15% { opacity: 1; transform: translate(-50%, -4px) scale(1); }
+      85% { opacity: 1; transform: translate(-50%, -26px) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -38px) scale(0.96); }
+    }
+    .world-float-label {
+      position: fixed;
+      pointer-events: none;
+      z-index: 25;
+      animation: floatUpFade 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95);
+    }
+
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.45);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.32);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(229, 169, 76, 0.55);
+    }
+  </style>
+</head>
+<body>
+  <!-- 3D WebGL Viewport -->
+  <div id="canvas-container"></div>
+
+  <!-- Hover Cursor Tooltip -->
+  <div id="hover-tooltip" class="hidden fixed z-30 pointer-events-none px-3 py-1.5 rounded-lg cw-panel text-xs shadow-xl border border-slate-700/80">
+    <div id="hover-title" class="font-display font-bold text-amber-300 tracking-wide"></div>
+    <div id="hover-sub" class="text-slate-300 text-[11px] mt-0.5"></div>
+  </div>
+
+  <!-- HUD OVERLAY CONTAINER -->
+  <div id="hud-root" class="fixed inset-0 z-10 pointer-events-none flex flex-col justify-between p-2 sm:p-3">
+    
+    <!-- TOP TELEMETRY, AI AUTOPILOT & RESOURCE BAR -->
+    <header class="pointer-events-auto w-full flex flex-wrap items-center justify-between gap-2 cw-panel-brass rounded-xl px-3 py-2">
+      <!-- Brand Title -->
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500/25 to-amber-900/40 border border-amber-400/50 flex items-center justify-center text-amber-300 shadow-inner">
+          <svg class="w-5 h-5 spin-slow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </div>
+        <div>
+          <div class="font-display font-bold text-sm sm:text-base tracking-wider text-amber-300 leading-none">CLOCKWORK FACTORY</div>
+          <div class="text-[10px] text-slate-400 tracking-widest uppercase mt-0.5">3D Automation Benchmark</div>
+        </div>
+      </div>
+
+      <!-- AI AUTOPILOT PRIMARY CONTROL CLUSTER -->
+      <div class="flex items-center gap-1.5 bg-slate-950/80 px-2.5 py-1.5 rounded-xl border border-cyan-500/35">
+        <button id="btn-ai-toggle" title="Toggle Autonomous AI Architect (Hotkey: P)" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-display font-bold tracking-wider text-slate-200 flex items-center gap-2 transition">
+          <span id="ai-status-dot" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+          <span id="ai-toggle-label">AI AUTO-PLAY: OFF</span>
+        </button>
+
+        <button id="btn-ai-follow" title="Camera Follow AI Architect Drone" class="px-2.5 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-[11px] font-semibold text-slate-300 transition">
+          Follow AI: OFF
+        </button>
+
+        <button id="btn-speed" title="Toggle Simulation Speed (1x Normal / 3x Turbo)" class="px-2.5 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-xs font-mono-num font-bold text-amber-300 transition">
+          1x
+        </button>
+      </div>
+
+      <!-- Power Grid & Credits -->
+      <div class="flex items-center gap-3 bg-slate-950/65 px-3 py-1.5 rounded-lg border border-slate-800">
+        <!-- Power Meter -->
+        <div class="min-w-[138px] sm:min-w-[162px]">
+          <div class="flex items-center justify-between text-[11px] mb-1">
+            <span class="flex items-center gap-1 font-semibold text-cyan-300">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              POWER
+            </span>
+            <span id="hud-power-text" class="font-mono-num text-slate-200">40 / 0 W</span>
+            <span id="hud-power-eff" class="font-mono-num font-bold text-emerald-400">100%</span>
+          </div>
+          <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden p-[1px]">
+            <div id="hud-power-bar" class="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-300" style="width: 100%"></div>
+          </div>
+        </div>
+
+        <div class="h-7 w-[1px] bg-slate-800"></div>
+
+        <!-- Credits -->
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-full bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-300 font-display font-bold text-xs">$</div>
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-slate-400 leading-none">Credits</div>
+            <div id="hud-credits" class="font-mono-num font-bold text-sm sm:text-base text-amber-300 leading-tight">$650</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Global Resource Inventories & Live Rates -->
+      <div id="hud-resources" class="hidden 2xl:flex items-center gap-1.5"></div>
+
+      <!-- Simulation & Persistence Controls -->
+      <div class="flex items-center gap-1.5">
+        <button id="btn-pause" title="Pause / Resume (Space)" class="px-2.5 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600/60 text-xs font-semibold flex items-center gap-1.5 transition">
+          <span id="icon-pause">❚❚</span>
+          <span id="label-pause" class="hidden sm:inline">Running</span>
+        </button>
+        <button id="btn-save" title="Save Factory to LocalStorage" class="px-2.5 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600/60 text-xs font-medium text-slate-200 transition">
+          Save
+        </button>
+        <button id="btn-load" title="Restore Saved Factory" class="px-2.5 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600/60 text-xs font-medium text-slate-200 transition">
+          Load
+        </button>
+        <button id="btn-mute" title="Toggle Audio Effects" class="p-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600/60 text-slate-200 transition">
+          <svg id="icon-sound-on" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+          <svg id="icon-sound-off" class="w-4 h-4 hidden text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <line x1="23" y1="9" x2="17" y2="15"></line>
+            <line x1="17" y1="9" x2="23" y2="15"></line>
+          </svg>
+        </button>
+        <button id="btn-reset" title="Start New Factory" class="px-2.5 py-1.5 rounded-lg bg-red-950/75 hover:bg-red-900/85 border border-red-700/50 text-xs font-medium text-red-200 transition">
+          New
+        </button>
+      </div>
+    </header>
+
+    <!-- Compact Resource Strip & Power Overload Alert -->
+    <div class="flex flex-col items-center gap-1 mt-1">
+      <div id="hud-resources-mobile" class="2xl:hidden pointer-events-auto flex items-center justify-center flex-wrap gap-1.5 cw-panel rounded-lg px-2 py-1"></div>
+      <div id="power-warning-banner" class="hidden pointer-events-none px-3 py-1 rounded-full bg-red-950/90 border border-red-500/70 text-[11px] font-display font-bold tracking-wider uppercase text-red-200 shadow-lg">
+        ⚠ POWER GRID OVERLOAD — MACHINES THROTTLED TO <span id="power-warning-pct">50%</span> SPEED
+      </div>
+    </div>
+
+    <!-- MIDDLE WORKSPACE: LEFT CAMPAIGN & AI BRAIN | RIGHT BUILDING INSPECTOR -->
+    <div class="flex-1 flex items-start justify-between my-2 overflow-hidden gap-2">
+      
+      <!-- LEFT STACK: CAMPAIGN OBJECTIVES + AI BRAIN HUD PANEL -->
+      <div class="flex flex-col gap-2 max-h-full overflow-y-auto w-64 sm:w-72 pointer-events-none">
+        
+        <!-- Campaign Objectives Card -->
+        <aside class="pointer-events-auto cw-panel-brass rounded-xl p-3 flex flex-col gap-2">
+          <div class="flex items-center justify-between">
+            <span id="stage-badge" class="px-2 py-0.5 rounded bg-amber-500/20 border border-amber-400/40 text-amber-300 font-display font-bold text-[11px] tracking-wider uppercase">
+              STAGE 1 / 5
+            </span>
+            <span id="stage-reward-badge" class="text-[11px] font-mono-num text-emerald-400 font-semibold">
+              +$300
+            </span>
+          </div>
+
+          <div>
+            <h2 id="stage-title" class="font-display font-bold text-sm sm:text-base text-white leading-snug">
+              Stage 1: Smelting Operations
+            </h2>
+            <p id="stage-desc" class="text-xs text-slate-300 mt-0.5 leading-relaxed">
+              Extract Raw Ore and smelt 4 Metal Ingots into Storage.
+            </p>
+          </div>
+
+          <div id="stage-goals" class="flex flex-col gap-1.5 pt-1 border-t border-slate-800/90"></div>
+
+          <div id="stage-unlock-box" class="text-[11px] bg-slate-900/80 border border-slate-800 rounded-lg px-2.5 py-1 text-cyan-300 flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+            </svg>
+            <span id="stage-unlock-text">Unlocks: Assembler &amp; Splitter</span>
+          </div>
+        </aside>
+
+        <!-- LIVE AI BRAIN HUD PANEL -->
+        <aside id="ai-brain-panel" class="pointer-events-auto cw-panel-ai rounded-xl p-3 flex flex-col gap-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5">
+              <span id="ai-brain-led" class="w-2 h-2 rounded-full bg-slate-500"></span>
+              <span class="font-display font-bold text-xs tracking-wider uppercase text-cyan-300">AI Architect Core</span>
+            </div>
+            <span id="ai-phase-tag" class="font-mono-num text-[10px] px-1.5 py-0.5 rounded bg-cyan-950/90 border border-cyan-500/40 text-cyan-200">
+              STANDBY
+            </span>
+          </div>
+
+          <div class="bg-slate-950/80 border border-slate-800/90 rounded-lg px-2.5 py-1.5 text-[11px]">
+            <div class="text-slate-400 text-[10px] uppercase tracking-wider">Current Directive</div>
+            <div id="ai-current-action" class="font-semibold text-white mt-0.5 truncate">
+              Press [P] or click AI AUTO-PLAY to engage
+            </div>
+          </div>
+
+          <!-- Diagnostics Row -->
+          <div class="grid grid-cols-3 gap-1 text-center bg-slate-950/65 border border-slate-800/80 rounded-lg p-1.5">
+            <div>
+              <div class="text-[9px] text-slate-400 uppercase">Headroom</div>
+              <div id="ai-diag-power" class="font-mono-num text-[11px] font-bold text-emerald-400">+40W</div>
+            </div>
+            <div>
+              <div class="text-[9px] text-slate-400 uppercase">Active Lines</div>
+              <div id="ai-diag-lines" class="font-mono-num text-[11px] font-bold text-cyan-300">0</div>
+            </div>
+            <div>
+              <div class="text-[9px] text-slate-400 uppercase">Queue</div>
+              <div id="ai-diag-queue" class="font-mono-num text-[11px] font-bold text-amber-300">0 ops</div>
+            </div>
+          </div>
+
+          <!-- Live Scrolling Decision Log -->
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-slate-400 mb-1">Decision Telemetry</div>
+            <div id="ai-decision-log" class="h-28 overflow-y-auto bg-slate-950/85 border border-slate-800/90 rounded-lg p-2 flex flex-col gap-1 font-mono-num text-[10px] leading-snug">
+              <div class="text-slate-500">[00:00] AI Architect initialized &amp; ready.</div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- RIGHT PANEL: BUILDING INSPECTOR -->
+      <aside id="inspector-panel" class="hidden pointer-events-auto w-72 sm:w-80 cw-panel-brass rounded-xl p-3.5 flex flex-col gap-3 max-h-full overflow-y-auto">
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 id="insp-name" class="font-display font-bold text-base text-amber-300">Furnace</h3>
+              <span id="insp-coords" class="font-mono-num text-[11px] text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded">[12, 12]</span>
+            </div>
+            <div id="insp-subtitle" class="text-xs text-slate-400 mt-0.5">Blast smelter</div>
+          </div>
+          <button id="insp-close" title="Close Inspector (Right-Click)" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+            ✕
+          </button>
+        </div>
+
+        <!-- Operational Status & Wattage -->
+        <div class="flex items-center justify-between bg-slate-950/75 border border-slate-800 rounded-lg px-2.5 py-2">
+          <span id="insp-status-badge" class="px-2 py-0.5 rounded text-[11px] font-display font-bold tracking-wider uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+            ACTIVE
+          </span>
+          <span id="insp-power-text" class="font-mono-num text-xs text-cyan-300 font-semibold">
+            -25W
+          </span>
+        </div>
+
+        <!-- Overclock Boost Indicator -->
+        <div id="insp-boost-badge" class="hidden bg-cyan-950/70 border border-cyan-500/40 rounded-lg px-2.5 py-1.5 text-xs text-cyan-200 flex items-center justify-between">
+          <span>⚡ Overclocker Resonance</span>
+          <span id="insp-boost-val" class="font-mono-num font-bold text-cyan-300">+35% Speed</span>
+        </div>
+
+        <!-- Processing Progress Bar -->
+        <div id="insp-progress-wrap">
+          <div class="flex justify-between text-[11px] text-slate-300 mb-1">
+            <span id="insp-progress-label">Processing Cycle</span>
+            <span id="insp-progress-pct" class="font-mono-num">0%</span>
+          </div>
+          <div class="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800 p-[1px]">
+            <div id="insp-progress-bar" class="h-full rounded-full bg-gradient-to-r from-amber-500 to-cyan-400 transition-all duration-100" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <!-- Assembler Auto / Manual Recipe Selector -->
+        <div id="insp-recipe-wrap" class="hidden flex flex-col gap-1.5">
+          <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Fabrication Mode</div>
+          <div id="insp-recipe-list" class="flex flex-col gap-1.5"></div>
+        </div>
+
+        <!-- Storage Auto-Output Toggle -->
+        <div id="insp-storage-wrap" class="hidden flex items-center justify-between bg-slate-900/80 border border-slate-800 rounded-lg px-2.5 py-2">
+          <div>
+            <div class="text-xs font-semibold text-slate-200">Front Output Ejection</div>
+            <div class="text-[10px] text-slate-400">Route stored items out orange port</div>
+          </div>
+          <button id="insp-storage-toggle" class="px-2.5 py-1 rounded-md text-xs font-bold border transition">
+            OFF
+          </button>
+        </div>
+
+        <!-- Live Inventories -->
+        <div id="insp-inventory-wrap" class="flex flex-col gap-2">
+          <div id="insp-inputs-section">
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Input Buffer</div>
+            <div id="insp-inputs-grid" class="grid grid-cols-2 gap-1.5"></div>
+          </div>
+          <div id="insp-outputs-section">
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Output / Vault Inventory</div>
+            <div id="insp-outputs-grid" class="grid grid-cols-2 gap-1.5"></div>
+          </div>
+        </div>
+
+        <!-- Building Actions -->
+        <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800">
+          <button id="insp-rotate-btn" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600/60 text-xs font-semibold text-slate-100 flex items-center justify-center gap-1.5 transition">
+            <span>↻</span> Rotate (R)
+          </button>
+          <button id="insp-delete-btn" class="px-3 py-2 rounded-lg bg-red-950/80 hover:bg-red-900 border border-red-700/60 text-xs font-semibold text-red-200 flex items-center justify-center gap-1.5 transition">
+            <span>✕</span> Demolish (<span id="insp-refund">$0</span>)
+          </button>
+        </div>
+      </aside>
+    </div>
+
+    <!-- BOTTOM CONSTRUCTION TOOLBAR -->
+    <footer class="pointer-events-auto flex flex-col items-center gap-1.5">
+      <div class="px-3 py-1 rounded-full cw-panel text-[11px] text-slate-300 flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5">
+        <span><strong class="text-cyan-300">[P]</strong> AI Autopilot</span>
+        <span class="text-slate-600">•</span>
+        <span><strong class="text-amber-300">L-Click / Drag:</strong> Build &amp; Paint Belts</span>
+        <span class="text-slate-600">•</span>
+        <span><strong class="text-amber-300">[R]</strong> Rotate (<span class="text-emerald-400">IN</span>/<span class="text-orange-400">OUT</span>)</span>
+        <span class="text-slate-600">•</span>
+        <span><strong class="text-amber-300">WASD / Drag / Scroll:</strong> Camera</span>
+        <span class="text-slate-600">•</span>
+        <span><strong class="text-amber-300">[Del]</strong> Demolish</span>
+      </div>
+
+      <div id="hotbar" class="cw-panel-brass rounded-2xl p-1.5 sm:p-2 flex items-center gap-1.5 sm:gap-2 overflow-x-auto max-w-full"></div>
+    </footer>
+  </div>
+
+  <!-- TOAST NOTIFICATION BANNER -->
+  <div id="toast-banner" class="hidden fixed top-20 left-1/2 -translate-x-1/2 z-40 px-4 py-2 rounded-xl cw-panel-brass border-amber-400/70 text-sm font-display font-bold text-amber-200 shadow-2xl pointer-events-none transition-all"></div>
+
+  <!-- STAGE 5 VICTORY MODAL -->
+  <div id="victory-modal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="cw-panel-brass rounded-2xl max-w-lg w-full p-6 text-center border-2 border-amber-400/70 shadow-2xl">
+      <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-amber-400/30 to-cyan-500/20 border border-amber-300 flex items-center justify-center text-amber-300 mb-3 shadow-lg">
+        <svg class="w-9 h-9 spin-slow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </div>
+      <div class="text-xs font-display font-bold tracking-widest uppercase text-cyan-300">All 5 Stages Completed</div>
+      <h2 class="font-display font-bold text-2xl sm:text-3xl text-amber-300 mt-1">CLOCKWORK MASTERWORK</h2>
+      <p class="text-sm text-slate-300 mt-2">
+        Your industrial automation network has synthesized and vaulted 15 Robot Components!
+      </p>
+
+      <div id="victory-stats" class="grid grid-cols-2 gap-2.5 my-5 text-left"></div>
+
+      <div class="flex flex-col sm:flex-row gap-2.5 justify-center">
+        <button id="btn-continue-sandbox" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-display font-bold text-sm tracking-wide shadow-lg transition">
+          Continue Freeplay
+        </button>
+        <button id="btn-victory-restart" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-display font-bold text-sm tracking-wide transition">
+          Restart Factory
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEW FACTORY CONFIRMATION MODAL -->
+  <div id="reset-modal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="cw-panel-brass rounded-2xl max-w-sm w-full p-5 text-center border border-red-500/50 shadow-2xl">
+      <h3 class="font-display font-bold text-lg text-red-300">Start New Factory?</h3>
+      <p class="text-xs text-slate-300 mt-2 leading-relaxed">
+        This will dismantle all machinery, clear conveyor belts, and reset campaign progress to Stage 1 with $650.
+      </p>
+      <div class="flex gap-2.5 justify-center mt-5">
+        <button id="btn-reset-cancel" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition">
+          Cancel
+        </button>
+        <button id="btn-reset-confirm" class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-xs font-bold text-white transition">
+          Confirm Reset
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // =========================================================================
+      // 1. CONSTANTS, ECONOMY & RECIPE DEFINITIONS
+      // =========================================================================
+      const GRID_SIZE = 24;
+      const TILE_SIZE = 2.0;
+      const HALF_WORLD = (GRID_SIZE * TILE_SIZE) / 2;
+      const SAVE_KEY = 'clockwork_factory_autopilot_v2';
+
+      // Facing directions: forward output port points along +Z when dir = 0
+      const DIR_VECTORS = [
+        { dx: 0, dz: 1, name: 'South (+Z)' },  // 0
+        { dx: 1, dz: 0, name: 'East (+X)' },   // 1
+        { dx: 0, dz: -1, name: 'North (-Z)' }, // 2
+        { dx: -1, dz: 0, name: 'West (-X)' }   // 3
+      ];
+
+      const BASE_POWER_W = 40;
+      const BELT_SPEED = 1.35;   // tiles per second at 100% power
+      const MIN_SPACING = 0.45;  // minimum spacing between items on belt
+
+      const ITEMS = {
+        ore: {
+          id: 'ore',
+          name: 'Ore',
+          short: 'Ore',
+          color: '#f59e0b',
+          creditValue: 5
+        },
+        crystal: {
+          id: 'crystal',
+          name: 'Crystal',
+          short: 'Crystal',
+          color: '#38bdf8',
+          creditValue: 8
+        },
+        metal: {
+          id: 'metal',
+          name: 'Metal',
+          short: 'Metal',
+          color: '#cbd5e1',
+          creditValue: 15
+        },
+        energy_cell: {
+          id: 'energy_cell',
+          name: 'Energy Cell',
+          short: 'Cell',
+          color: '#22d3ee',
+          creditValue: 20
+        },
+        circuit: {
+          id: 'circuit',
+          name: 'Circuit',
+          short: 'Circuit',
+          color: '#10b981',
+          creditValue: 55
+        },
+        robot_component: {
+          id: 'robot_component',
+          name: 'Robot Component',
+          short: 'Robot',
+          color: '#f43f5e',
+          creditValue: 160
+        }
+      };
+
+      const ITEM_ORDER = ['ore', 'crystal', 'metal', 'energy_cell', 'circuit', 'robot_component'];
+
+      // Assembler recipes (checked in priority order during Auto-Recipe mode)
+      const ASSEMBLER_RECIPES = {
+        robot_component: {
+          id: 'robot_component',
+          name: 'Robot Component',
+          inputs: { circuit: 1, metal: 1 },
+          output: 'robot_component',
+          outputCount: 1,
+          duration: 4.0,
+          color: 0xf43f5e,
+          summary: '1 Circuit + 1 Metal → 1 Robot Comp. (4.0s)'
+        },
+        circuit: {
+          id: 'circuit',
+          name: 'Circuit',
+          inputs: { metal: 1, energy_cell: 1 },
+          output: 'circuit',
+          outputCount: 1,
+          duration: 3.0,
+          color: 0x10b981,
+          summary: '1 Metal + 1 Energy Cell → 1 Circuit (3.0s)'
+        },
+        energy_cell: {
+          id: 'energy_cell',
+          name: 'Energy Cell (Ore Fallback)',
+          inputs: { ore: 2 },
+          output: 'energy_cell',
+          outputCount: 1,
+          duration: 3.0,
+          color: 0x22d3ee,
+          summary: '2 Ore → 1 Energy Cell (3.0s)'
+        }
+      };
+
+      const RECIPE_PRIORITY = ['robot_component', 'circuit', 'energy_cell'];
+
+      const BUILDINGS = {
+        miner: {
+          id: 'miner',
+          key: '1',
+          name: 'Miner',
+          cost: 50,
+          powerDraw: 15,
+          powerGen: 0,
+          unlockStage: 0,
+          desc: 'Extracts Ore on Ore Veins or Crystal on Crystal Veins (0.6x on bare floor).'
+        },
+        conveyor: {
+          id: 'conveyor',
+          key: '2',
+          name: 'Conveyor',
+          cost: 10,
+          powerDraw: 1,
+          powerGen: 0,
+          unlockStage: 0,
+          desc: 'Transports physical items across the factory floor.'
+        },
+        splitter: {
+          id: 'splitter',
+          key: '3',
+          name: 'Splitter',
+          cost: 25,
+          powerDraw: 2,
+          powerGen: 0,
+          unlockStage: 1,
+          desc: '3-way round-robin junction distributing rear intake to Front, Left & Right.'
+        },
+        furnace: {
+          id: 'furnace',
+          key: '4',
+          name: 'Furnace',
+          cost: 80,
+          powerDraw: 25,
+          powerGen: 0,
+          unlockStage: 0,
+          desc: 'Smelts Ore → Metal (2.0s) or Crystal → Energy Cell (2.0s).'
+        },
+        assembler: {
+          id: 'assembler',
+          key: '5',
+          name: 'Assembler',
+          cost: 120,
+          powerDraw: 35,
+          powerGen: 0,
+          unlockStage: 1,
+          desc: 'Robotic bay supporting Auto-Recipe or locked recipes for Circuits & Robot Parts.'
+        },
+        generator: {
+          id: 'generator',
+          key: '6',
+          name: 'Generator',
+          cost: 100,
+          powerDraw: 0,
+          powerGen: 120,
+          unlockStage: 0,
+          desc: 'Clockwork Tesla turbine generating +120W of grid electricity.'
+        },
+        storage: {
+          id: 'storage',
+          key: '7',
+          name: 'Storage',
+          cost: 60,
+          powerDraw: 5,
+          powerGen: 0,
+          unlockStage: 0,
+          desc: 'Holographic vault (cap 150) banking objectives & awarding credits.'
+        },
+        overclocker: {
+          id: 'overclocker',
+          key: '8',
+          name: 'Overclocker',
+          cost: 150,
+          powerDraw: 20,
+          powerGen: 0,
+          unlockStage: 2,
+          desc: 'Resonance spire boosting adjacent machines’ speed by +35%.'
+        }
+      };
+
+      const BUILDING_LIST = ['miner', 'conveyor', 'splitter', 'furnace', 'assembler', 'generator', 'storage', 'overclocker'];
+
+      const STAGES = [
+        {
+          title: 'Stage 1: Smelting Operations',
+          desc: 'Extract Amber Ore and smelt 4 Metal Ingots into a Storage Vault.',
+          rewardCredits: 300,
+          unlockText: 'Unlocks: Assembler & Splitter',
+          goals: [
+            { id: 'metal', label: 'Produce & Store Metal', target: 4, getVal: (s) => s.stats.storedTotal.metal }
+          ]
+        },
+        {
+          title: 'Stage 2: Circuit Synthesis',
+          desc: 'Combine Metal + Energy Cells (from Crystal Veins or 2 Ore) to store 4 Circuits.',
+          rewardCredits: 500,
+          unlockText: 'Unlocks: Overclocker Spire',
+          goals: [
+            { id: 'circuits', label: 'Produce & Store Circuits', target: 4, getVal: (s) => s.stats.storedTotal.circuit }
+          ]
+        },
+        {
+          title: 'Stage 3: First Automata',
+          desc: 'Assemble Circuits + Metal to store 3 Robot Components.',
+          rewardCredits: 800,
+          unlockText: 'Advances to Mass Assembly',
+          goals: [
+            { id: 'robots3', label: 'Store Robot Components', target: 3, getVal: (s) => s.stats.storedTotal.robot_component }
+          ]
+        },
+        {
+          title: 'Stage 4: Industrial Scale-Up',
+          desc: 'Scale up power and logistics to store 8 Robot Components.',
+          rewardCredits: 1200,
+          unlockText: 'Advances to Final Production Benchmark',
+          goals: [
+            { id: 'robots8', label: 'Store Robot Components', target: 8, getVal: (s) => s.stats.storedTotal.robot_component }
+          ]
+        },
+        {
+          title: 'Stage 5: Clockwork Masterwork',
+          desc: 'Manufacture and vault 15 Robot Components to complete the campaign.',
+          rewardCredits: 2500,
+          unlockText: 'Completes Campaign & Unlocks Freeplay',
+          goals: [
+            { id: 'robots15', label: 'Store Robot Components', target: 15, getVal: (s) => s.stats.storedTotal.robot_component }
+          ]
+        }
+      ];
+
+      // =========================================================================
+      // 2. PROCEDURAL WEB AUDIO ENGINE
+      // =========================================================================
+      class SoundEngine {
+        constructor() {
+          this.ctx = null;
+          this.muted = false;
+        }
+
+        ensureContext() {
+          if (this.muted) return null;
+          if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) this.ctx = new AudioCtx();
+          }
+          if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume().catch(() => {});
+          }
+          return this.ctx;
+        }
+
+        playPlace(isAI = false) {
+          const ctx = this.ensureContext();
+          if (!ctx) return;
+          const now = ctx.currentTime;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = isAI ? 'sine' : 'triangle';
+          osc.frequency.setValueAtTime(isAI ? 320 : 210, now);
+          osc.frequency.exponentialRampToValueAtTime(isAI ? 140 : 80, now + 0.08);
+          gain.gain.setValueAtTime(isAI ? 0.08 : 0.16, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.095);
+        }
+
+        playRotate() {
+          const ctx = this.ensureContext();
+          if (!ctx) return;
+          const now = ctx.currentTime;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(360, now);
+          osc.frequency.exponentialRampToValueAtTime(540, now + 0.045);
+          gain.gain.setValueAtTime(0.07, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.06);
+        }
+
+        playDelete() {
+          const ctx = this.ensureContext();
+          if (!ctx) return;
+          const now = ctx.currentTime;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(160, now);
+          osc.frequency.exponentialRampToValueAtTime(52, now + 0.13);
+          gain.gain.setValueAtTime(0.13, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.15);
+        }
+
+        playClick() {
+          const ctx = this.ensureContext();
+          if (!ctx) return;
+          const now = ctx.currentTime;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(640, now);
+          gain.gain.setValueAtTime(0.055, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.035);
+        }
+
+        playError() {
+          const ctx = this.ensureContext();
+          if (!ctx) return;
+          const now = ctx.currentTime;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(115, now);
+          osc.frequency.linearRampToValueAtTime(90, now + 0.11);
+          gain.gain.setValueAtTime(0.09, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.13);
+        }
+
+        playStageComplete() {
+          const ctx = this.ensureContext();
+          if (!ctx) return;
+          const notes = [440, 554.37, 659.25, 880];
+          notes.forEach((freq, idx) => {
+            const now = ctx.currentTime + idx * 0.09;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now);
+            gain.gain.setValueAtTime(0.14, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.46);
+          });
+        }
+      }
+
+      const sound = new SoundEngine();
+
+      // =========================================================================
+      // 3. GAME STATE & SIMULATION STRUCTURES
+      // =========================================================================
+      const state = {
+        credits: 650,
+        totalCreditsEarned: 650,
+        stageIndex: 0,
+        campaignComplete: false,
+        sandboxMode: false,
+        paused: false,
+        simSpeed: 1, // 1 or 3
+        simTime: 0,
+
+        activeTool: null,
+        placementDir: 0,
+        selectedBuildingId: null,
+        hoveredTile: null,
+
+        grid: Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null)),
+        buildings: new Map(),
+        nextBuildingId: 1,
+        veins: new Map(), // "gx,gz" -> 'ore' | 'crystal'
+
+        powerSupply: BASE_POWER_W,
+        powerDemand: 0,
+        powerEfficiency: 1.0,
+
+        stats: {
+          produced: { ore: 0, crystal: 0, metal: 0, energy_cell: 0, circuit: 0, robot_component: 0 },
+          storedTotal: { ore: 0, crystal: 0, metal: 0, energy_cell: 0, circuit: 0, robot_component: 0 },
+          buildingsPlaced: 0
+        },
+
+        productionLog: {
+          ore: [],
+          crystal: [],
+          metal: [],
+          energy_cell: [],
+          circuit: [],
+          robot_component: []
+        },
+
+        camera: {
+          targetX: 0,
+          targetZ: 0,
+          yaw: Math.PI / 4,
+          pitch: 0.80,
+          distance: 35,
+          curTargetX: 0,
+          curTargetZ: 0,
+          curYaw: Math.PI / 4,
+          curPitch: 0.80,
+          curDistance: 35
+        }
+      };
+
+      function tileKey(gx, gz) {
+        return `${gx},${gz}`;
+      }
+
+      function inBounds(gx, gz) {
+        return gx >= 0 && gx < GRID_SIZE && gz >= 0 && gz < GRID_SIZE;
+      }
+
+      function gridToWorld(gx, gz) {
+        return {
+          x: (gx - (GRID_SIZE - 1) / 2) * TILE_SIZE,
+          z: (gz - (GRID_SIZE - 1) / 2) * TILE_SIZE
+        };
+      }
+
+      function worldToGrid(wx, wz) {
+        const gx = Math.round(wx / TILE_SIZE + (GRID_SIZE - 1) / 2);
+        const gz = Math.round(wz / TILE_SIZE + (GRID_SIZE - 1) / 2);
+        return { gx, gz };
+      }
+
+      function getBuildingAt(gx, gz) {
+        if (!inBounds(gx, gz)) return null;
+        return state.grid[gz][gx];
+      }
+
+      // =========================================================================
+      // 4. THREE.JS SCENE, PROCEDURAL TEXTURES & LIGHTING
+      // =========================================================================
+      let scene, camera, renderer, raycaster;
+      let platformGroup, veinsGroup, buildingsGroup, itemsGroup, particlesGroup, conduitsGroup, overlaysGroup;
+      let floorConduitMat, edgeConduitMat, hoverCursorMesh, selectionRingMesh, ghostGroup;
+      let currentGhostType = null;
+      let currentGhostValid = null;
+      let beltTexture = null;
+      let floorTileTexture = null;
+      let hazardTexture = null;
+
+      const itemGeometries = {};
+      const itemMaterials = {};
+
+      const particlePool = [];
+      const MAX_PARTICLES = 280;
+
+      function createProceduralTextures() {
+        // 1. Brushed Metallic Beveled Floor Panel Texture with Micro-Circuit Traces
+        const fCanvas = document.createElement('canvas');
+        fCanvas.width = 256;
+        fCanvas.height = 256;
+        const fCtx = fCanvas.getContext('2d');
+        fCtx.fillStyle = '#171e28';
+        fCtx.fillRect(0, 0, 256, 256);
+
+        fCtx.fillStyle = '#1e2734';
+        fCtx.fillRect(10, 10, 236, 236);
+
+        fCtx.strokeStyle = '#334155';
+        fCtx.lineWidth = 4;
+        fCtx.strokeRect(10, 10, 236, 236);
+
+        // Panel seams
+        fCtx.strokeStyle = 'rgba(10, 15, 24, 0.8)';
+        fCtx.lineWidth = 2;
+        fCtx.beginPath();
+        fCtx.moveTo(128, 12);
+        fCtx.lineTo(128, 244);
+        fCtx.moveTo(12, 128);
+        fCtx.lineTo(244, 128);
+        fCtx.stroke();
+
+        // Subtle emissive-style cyan micro-circuit etchings
+        fCtx.strokeStyle = 'rgba(34, 211, 238, 0.14)';
+        fCtx.lineWidth = 2;
+        fCtx.beginPath();
+        fCtx.moveTo(36, 64);
+        fCtx.lineTo(84, 64);
+        fCtx.lineTo(100, 80);
+        fCtx.moveTo(220, 192);
+        fCtx.lineTo(172, 192);
+        fCtx.lineTo(156, 176);
+        fCtx.stroke();
+
+        // Corner rivets
+        fCtx.fillStyle = '#475569';
+        [
+          [24, 24], [232, 24], [24, 232], [232, 232],
+          [116, 24], [140, 24], [116, 232], [140, 232]
+        ].forEach(([rx, ry]) => {
+          fCtx.beginPath();
+          fCtx.arc(rx, ry, 3.2, 0, Math.PI * 2);
+          fCtx.fill();
+        });
+
+        floorTileTexture = new THREE.CanvasTexture(fCanvas);
+        floorTileTexture.wrapS = THREE.RepeatWrapping;
+        floorTileTexture.wrapT = THREE.RepeatWrapping;
+        floorTileTexture.repeat.set(GRID_SIZE, GRID_SIZE);
+        floorTileTexture.anisotropy = 4;
+
+        // 2. Animated Conveyor Belt Treads with Directional Chevrons
+        const bCanvas = document.createElement('canvas');
+        bCanvas.width = 128;
+        bCanvas.height = 128;
+        const bCtx = bCanvas.getContext('2d');
+        bCtx.fillStyle = '#12161d';
+        bCtx.fillRect(0, 0, 128, 128);
+
+        bCtx.fillStyle = '#1d2430';
+        for (let y = 0; y < 128; y += 16) {
+          bCtx.fillRect(8, y, 112, 6);
+        }
+
+        bCtx.strokeStyle = '#e5a94c';
+        bCtx.lineWidth = 7;
+        bCtx.lineCap = 'round';
+        bCtx.lineJoin = 'round';
+        [36, 100].forEach((cy) => {
+          bCtx.beginPath();
+          bCtx.moveTo(32, cy - 14);
+          bCtx.lineTo(64, cy + 10);
+          bCtx.lineTo(96, cy - 14);
+          bCtx.stroke();
+        });
+
+        beltTexture = new THREE.CanvasTexture(bCanvas);
+        beltTexture.wrapS = THREE.RepeatWrapping;
+        beltTexture.wrapT = THREE.RepeatWrapping;
+        beltTexture.anisotropy = 4;
+
+        // 3. Perimeter Hazard Stripe Texture
+        const hCanvas = document.createElement('canvas');
+        hCanvas.width = 128;
+        hCanvas.height = 128;
+        const hCtx = hCanvas.getContext('2d');
+        hCtx.fillStyle = '#d97706';
+        hCtx.fillRect(0, 0, 128, 128);
+        hCtx.fillStyle = '#0f172a';
+        for (let i = -128; i < 256; i += 32) {
+          hCtx.beginPath();
+          hCtx.moveTo(i, 0);
+          hCtx.lineTo(i + 16, 0);
+          hCtx.lineTo(i - 48, 128);
+          hCtx.lineTo(i - 64, 128);
+          hCtx.closePath();
+          hCtx.fill();
+        }
+        hazardTexture = new THREE.CanvasTexture(hCanvas);
+        hazardTexture.wrapS = THREE.RepeatWrapping;
+        hazardTexture.wrapT = THREE.RepeatWrapping;
+        hazardTexture.repeat.set(24, 1);
+      }
+
+      function initThree() {
+        const container = document.getElementById('canvas-container');
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x080c13);
+        scene.fog = new THREE.FogExp2(0x080c13, 0.008);
+
+        camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.5, 220);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.14;
+        container.appendChild(renderer.domElement);
+
+        raycaster = new THREE.Raycaster();
+
+        createProceduralTextures();
+        initSharedItemAssets();
+
+        platformGroup = new THREE.Group();
+        veinsGroup = new THREE.Group();
+        buildingsGroup = new THREE.Group();
+        itemsGroup = new THREE.Group();
+        particlesGroup = new THREE.Group();
+        conduitsGroup = new THREE.Group();
+        overlaysGroup = new THREE.Group();
+
+        scene.add(platformGroup);
+        scene.add(veinsGroup);
+        scene.add(conduitsGroup);
+        scene.add(buildingsGroup);
+        scene.add(itemsGroup);
+        scene.add(particlesGroup);
+        scene.add(overlaysGroup);
+
+        buildLighting();
+        buildFactoryPlatform();
+        buildOverlays();
+        initParticlePool();
+      }
+
+      function buildLighting() {
+        const hemiLight = new THREE.HemisphereLight(0xdbeafe, 0x1e293b, 0.75);
+        hemiLight.position.set(0, 40, 0);
+        scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xfff4e0, 1.25);
+        dirLight.position.set(28, 44, 24);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 10;
+        dirLight.shadow.camera.far = 115;
+        const d = 30;
+        dirLight.shadow.camera.left = -d;
+        dirLight.shadow.camera.right = d;
+        dirLight.shadow.camera.top = d;
+        dirLight.shadow.camera.bottom = -d;
+        dirLight.shadow.bias = -0.0005;
+        scene.add(dirLight);
+
+        const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.42);
+        rimLight.position.set(-30, 22, -26);
+        scene.add(rimLight);
+      }
+
+      function buildFactoryPlatform() {
+        const fullSpan = GRID_SIZE * TILE_SIZE; // 48
+
+        const deckGeo = new THREE.BoxGeometry(fullSpan, 0.6, fullSpan);
+        const deckMat = new THREE.MeshStandardMaterial({
+          map: floorTileTexture,
+          metalness: 0.65,
+          roughness: 0.40
+        });
+        const deckMesh = new THREE.Mesh(deckGeo, deckMat);
+        deckMesh.position.y = -0.3;
+        deckMesh.receiveShadow = true;
+        deckMesh.name = 'factory_deck';
+        platformGroup.add(deckMesh);
+
+        // Perimeter Hazard Frame
+        const borderThick = 0.65;
+        const borderHeight = 0.72;
+        const hazardMat = new THREE.MeshStandardMaterial({
+          map: hazardTexture,
+          metalness: 0.35,
+          roughness: 0.55
+        });
+
+        [
+          { w: fullSpan + borderThick * 2, d: borderThick, x: 0, z: -HALF_WORLD - borderThick / 2 },
+          { w: fullSpan + borderThick * 2, d: borderThick, x: 0, z: HALF_WORLD + borderThick / 2 },
+          { w: borderThick, d: fullSpan, x: HALF_WORLD + borderThick / 2, z: 0 },
+          { w: borderThick, d: fullSpan, x: -HALF_WORLD - borderThick / 2, z: 0 }
+        ].forEach((b) => {
+          const m = new THREE.Mesh(new THREE.BoxGeometry(b.w, borderHeight, b.d), hazardMat);
+          m.position.set(b.x, -0.28, b.z);
+          m.receiveShadow = true;
+          platformGroup.add(m);
+        });
+
+        // Glowing Edge Power Conduits along platform perimeter
+        edgeConduitMat = new THREE.MeshBasicMaterial({ color: 0x22d3ee });
+        [
+          { w: fullSpan + 0.2, d: 0.14, x: 0, z: -HALF_WORLD - 0.05 },
+          { w: fullSpan + 0.2, d: 0.14, x: 0, z: HALF_WORLD + 0.05 },
+          { w: 0.14, d: fullSpan + 0.2, x: HALF_WORLD + 0.05, z: 0 },
+          { w: 0.14, d: fullSpan + 0.2, x: -HALF_WORLD - 0.05, z: 0 }
+        ].forEach((e) => {
+          const strip = new THREE.Mesh(new THREE.BoxGeometry(e.w, 0.14, e.d), edgeConduitMat);
+          strip.position.set(e.x, 0.09, e.z);
+          platformGroup.add(strip);
+        });
+
+        // Under-deck Structural Trusses & Pillars
+        const girderMat = new THREE.MeshStandardMaterial({
+          color: 0x0f172a,
+          metalness: 0.78,
+          roughness: 0.38
+        });
+        for (let i = -20; i <= 20; i += 8) {
+          const beamX = new THREE.Mesh(new THREE.BoxGeometry(fullSpan + 0.8, 1.1, 0.55), girderMat);
+          beamX.position.set(0, -1.15, i);
+          platformGroup.add(beamX);
+
+          const beamZ = new THREE.Mesh(new THREE.BoxGeometry(0.55, 1.1, fullSpan + 0.8), girderMat);
+          beamZ.position.set(i, -1.15, 0);
+          platformGroup.add(beamZ);
+        }
+
+        [
+          [-21, -21], [0, -21], [21, -21],
+          [-21, 0], [21, 0],
+          [-21, 21], [0, 21], [21, 21]
+        ].forEach(([px, pz]) => {
+          const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 1.1, 18, 8), girderMat);
+          pillar.position.set(px, -9.6, pz);
+          platformGroup.add(pillar);
+        });
+
+        // Floor Power Conduit Channels
+        floorConduitMat = new THREE.MeshBasicMaterial({
+          color: 0x22d3ee,
+          transparent: true,
+          opacity: 0.38
+        });
+        for (let idx = 4; idx < GRID_SIZE; idx += 4) {
+          const offset = (idx - GRID_SIZE / 2) * TILE_SIZE;
+          const stripX = new THREE.Mesh(new THREE.PlaneGeometry(fullSpan, 0.08), floorConduitMat);
+          stripX.rotation.x = -Math.PI / 2;
+          stripX.position.set(0, 0.006, offset);
+          platformGroup.add(stripX);
+
+          const stripZ = new THREE.Mesh(new THREE.PlaneGeometry(0.08, fullSpan), floorConduitMat);
+          stripZ.rotation.x = -Math.PI / 2;
+          stripZ.position.set(offset, 0.006, 0);
+          platformGroup.add(stripZ);
+        }
+      }
+
+      function buildOverlays() {
+        const hoverGeo = new THREE.RingGeometry(TILE_SIZE * 0.42, TILE_SIZE * 0.48, 4);
+        hoverGeo.rotateZ(Math.PI / 4);
+        hoverGeo.rotateX(-Math.PI / 2);
+        const hoverMat = new THREE.MeshBasicMaterial({
+          color: 0xfbbf24,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.75
+        });
+        hoverCursorMesh = new THREE.Mesh(hoverGeo, hoverMat);
+        hoverCursorMesh.position.y = 0.02;
+        hoverCursorMesh.visible = false;
+        overlaysGroup.add(hoverCursorMesh);
+
+        const selGeo = new THREE.RingGeometry(TILE_SIZE * 0.44, TILE_SIZE * 0.52, 32);
+        selGeo.rotateX(-Math.PI / 2);
+        const selMat = new THREE.MeshBasicMaterial({
+          color: 0x22d3ee,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.92
+        });
+        selectionRingMesh = new THREE.Mesh(selGeo, selMat);
+        selectionRingMesh.position.y = 0.03;
+        selectionRingMesh.visible = false;
+        overlaysGroup.add(selectionRingMesh);
+
+        ghostGroup = new THREE.Group();
+        ghostGroup.visible = false;
+        overlaysGroup.add(ghostGroup);
+      }
+
+      function initSharedItemAssets() {
+        itemGeometries.ore = new THREE.OctahedronGeometry(0.22, 0);
+        itemMaterials.ore = new THREE.MeshStandardMaterial({
+          color: 0xd97706,
+          emissive: 0x78350f,
+          emissiveIntensity: 0.5,
+          roughness: 0.48,
+          metalness: 0.35
+        });
+
+        itemGeometries.crystal = new THREE.ConeGeometry(0.18, 0.38, 6);
+        itemMaterials.crystal = new THREE.MeshStandardMaterial({
+          color: 0x38bdf8,
+          emissive: 0x0284c7,
+          emissiveIntensity: 0.85,
+          roughness: 0.2,
+          metalness: 0.4
+        });
+
+        itemGeometries.metal = new THREE.BoxGeometry(0.36, 0.14, 0.22);
+        itemMaterials.metal = new THREE.MeshStandardMaterial({
+          color: 0xe2e8f0,
+          emissive: 0x334155,
+          emissiveIntensity: 0.25,
+          roughness: 0.22,
+          metalness: 0.88
+        });
+
+        itemGeometries.energy_cell = new THREE.CylinderGeometry(0.14, 0.14, 0.32, 12);
+        itemMaterials.energy_cell = new THREE.MeshStandardMaterial({
+          color: 0x22d3ee,
+          emissive: 0x06b6d4,
+          emissiveIntensity: 0.9,
+          roughness: 0.2,
+          metalness: 0.4
+        });
+
+        itemGeometries.circuit = new THREE.BoxGeometry(0.30, 0.08, 0.30);
+        itemMaterials.circuit = new THREE.MeshStandardMaterial({
+          color: 0x10b981,
+          emissive: 0x047857,
+          emissiveIntensity: 0.65,
+          roughness: 0.3,
+          metalness: 0.7
+        });
+
+        itemGeometries.robot_component = new THREE.TorusKnotGeometry(0.15, 0.055, 36, 8, 2, 3);
+        itemMaterials.robot_component = new THREE.MeshStandardMaterial({
+          color: 0xf43f5e,
+          emissive: 0x9f1239,
+          emissiveIntensity: 0.7,
+          roughness: 0.25,
+          metalness: 0.82
+        });
+      }
+
+      function createItemMesh(type) {
+        const mesh = new THREE.Mesh(itemGeometries[type], itemMaterials[type]);
+        mesh.castShadow = true;
+        itemsGroup.add(mesh);
+        return mesh;
+      }
+
+      // =========================================================================
+      // 5. SYMMETRIC AMBER ORE & CYAN CRYSTAL VEINS + 3D BUILDING MODELS
+      // =========================================================================
+      function generateResourceVeins(savedVeins = null) {
+        while (veinsGroup.children.length > 0) {
+          veinsGroup.remove(veinsGroup.children[0]);
+        }
+        state.veins.clear();
+
+        let list = savedVeins;
+        if (!list || list.length === 0) {
+          // Symmetrically distributed Amber Ore & Cyan Crystal Veins across all 4 quadrants
+          list = [
+            // Inner Quadrant Amber Ore Veins
+            { gx: 5, gz: 5, type: 'ore' },
+            { gx: 18, gz: 5, type: 'ore' },
+            { gx: 5, gz: 18, type: 'ore' },
+            { gx: 18, gz: 18, type: 'ore' },
+            // Outer Mid-Axis Amber Ore Veins
+            { gx: 11, gz: 3, type: 'ore' },
+            { gx: 12, gz: 20, type: 'ore' },
+            // Inner Quadrant Cyan Crystal Veins
+            { gx: 8, gz: 5, type: 'crystal' },
+            { gx: 15, gz: 5, type: 'crystal' },
+            { gx: 8, gz: 18, type: 'crystal' },
+            { gx: 15, gz: 18, type: 'crystal' },
+            // Lateral Cyan Crystal Veins
+            { gx: 3, gz: 11, type: 'crystal' },
+            { gx: 20, gz: 12, type: 'crystal' }
+          ];
+        }
+
+        const grateMat = new THREE.MeshStandardMaterial({
+          color: 0x1e293b,
+          metalness: 0.82,
+          roughness: 0.38
+        });
+        const oreMat = new THREE.MeshStandardMaterial({
+          color: 0xf59e0b,
+          emissive: 0xd97706,
+          emissiveIntensity: 0.78,
+          roughness: 0.28,
+          metalness: 0.45
+        });
+        const crystalMat = new THREE.MeshStandardMaterial({
+          color: 0x22d3ee,
+          emissive: 0x06b6d4,
+          emissiveIntensity: 0.92,
+          roughness: 0.2,
+          metalness: 0.55
+        });
+
+        list.forEach(({ gx, gz, type }) => {
+          if (!inBounds(gx, gz)) return;
+          state.veins.set(tileKey(gx, gz), type);
+          const pos = gridToWorld(gx, gz);
+          const group = new THREE.Group();
+          group.position.set(pos.x, 0.01, pos.z);
+
+          const base = new THREE.Mesh(new THREE.CylinderGeometry(0.76, 0.84, 0.08, 8), grateMat);
+          base.receiveShadow = true;
+          group.add(base);
+
+          const mat = type === 'crystal' ? crystalMat : oreMat;
+          const spires = [
+            { x: 0, z: 0, h: 0.56, r: 0.19, rx: 0.08, rz: -0.06 },
+            { x: -0.26, z: 0.18, h: 0.38, r: 0.13, rx: 0.24, rz: 0.26 },
+            { x: 0.26, z: 0.20, h: 0.42, r: 0.14, rx: 0.20, rz: -0.24 },
+            { x: -0.22, z: -0.24, h: 0.35, r: 0.12, rx: -0.26, rz: 0.2 },
+            { x: 0.24, z: -0.22, h: 0.40, r: 0.13, rx: -0.22, rz: -0.22 }
+          ];
+          spires.forEach((cfg) => {
+            const crystal = new THREE.Mesh(new THREE.ConeGeometry(cfg.r, cfg.h, type === 'crystal' ? 6 : 5), mat);
+            crystal.position.set(cfg.x, cfg.h * 0.45, cfg.z);
+            crystal.rotation.set(cfg.rx, Math.PI * 0.25, cfg.rz);
+            crystal.castShadow = true;
+            group.add(crystal);
+          });
+
+          veinsGroup.add(group);
+        });
+      }
+
+      // Clear 3D Directional Arrows: Green IN (#10b981) and Orange OUT (#f97316)
+      function createPortArrow(isOutput = true, y = 0.08, z = 0.84, rotY = 0) {
+        const shape = new THREE.Shape();
+        shape.moveTo(0, 0.20);
+        shape.lineTo(-0.18, -0.08);
+        shape.lineTo(0.18, -0.08);
+        shape.closePath();
+        const geo = new THREE.ShapeGeometry(shape);
+        geo.rotateX(Math.PI / 2);
+        const mat = new THREE.MeshBasicMaterial({
+          color: isOutput ? 0xf97316 : 0x10b981,
+          side: THREE.DoubleSide
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(0, y, z);
+        mesh.rotation.y = rotY;
+        return mesh;
+      }
+
+      function createClockworkGear(radius, thickness, teeth, mat) {
+        const gearGroup = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.78, radius * 0.78, thickness, 16), mat);
+        gearGroup.add(body);
+        const toothGeo = new THREE.BoxGeometry(radius * 0.24, thickness * 0.92, radius * 0.34);
+        for (let i = 0; i < teeth; i++) {
+          const angle = (i / teeth) * Math.PI * 2;
+          const tooth = new THREE.Mesh(toothGeo, mat);
+          tooth.position.set(Math.cos(angle) * radius * 0.88, 0, Math.sin(angle) * radius * 0.88);
+          tooth.rotation.y = -angle;
+          gearGroup.add(tooth);
+        }
+        return gearGroup;
+      }
+
+      function createBuildingMesh(type, isGhost = false) {
+        const root = new THREE.Group();
+        root.userData = { animParts: {} };
+
+        const steelMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.78, roughness: 0.34 });
+        const darkSteelMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.82, roughness: 0.38 });
+        const brassMat = new THREE.MeshStandardMaterial({ color: 0xd99b43, metalness: 0.84, roughness: 0.28 });
+        const copperMat = new THREE.MeshStandardMaterial({ color: 0xb45309, metalness: 0.78, roughness: 0.32 });
+
+        if (type === 'conveyor') {
+          const beltMat = new THREE.MeshStandardMaterial({
+            map: beltTexture,
+            roughness: 0.65,
+            metalness: 0.15
+          });
+          const belt = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.14, 1.96), beltMat);
+          belt.position.y = 0.14;
+          belt.receiveShadow = true;
+          root.add(belt);
+
+          const railGeo = new THREE.BoxGeometry(0.14, 0.24, 1.98);
+          const leftRail = new THREE.Mesh(railGeo, steelMat);
+          leftRail.position.set(-0.64, 0.16, 0);
+          leftRail.castShadow = true;
+          root.add(leftRail);
+
+          const rightRail = new THREE.Mesh(railGeo, steelMat);
+          rightRail.position.set(0.64, 0.16, 0);
+          rightRail.castShadow = true;
+          root.add(rightRail);
+
+          const bracketGeo = new THREE.BoxGeometry(0.18, 0.27, 0.22);
+          [[-0.64, -0.86], [0.64, -0.86], [-0.64, 0.86], [0.64, 0.86]].forEach(([bx, bz]) => {
+            const b = new THREE.Mesh(bracketGeo, brassMat);
+            b.position.set(bx, 0.16, bz);
+            root.add(b);
+          });
+        }
+
+        else if (type === 'splitter') {
+          const base = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.18, 1.65), darkSteelMat);
+          base.position.y = 0.09;
+          base.receiveShadow = true;
+          root.add(base);
+
+          const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.66, 0.74, 0.52, 6), steelMat);
+          hub.position.y = 0.42;
+          hub.castShadow = true;
+          root.add(hub);
+
+          const rotor = createClockworkGear(0.46, 0.12, 8, brassMat);
+          rotor.position.y = 0.74;
+          root.add(rotor);
+          root.userData.animParts.rotor = rotor;
+
+          // Green IN arrow at rear (-Z), 3 Orange OUT arrows (Front +Z, Left +X, Right -X)
+          root.add(createPortArrow(false, 0.20, -0.84, 0));
+          root.add(createPortArrow(true, 0.20, 0.84, 0));
+
+          const outLeft = createPortArrow(true, 0.20, 0, Math.PI / 2);
+          outLeft.position.set(0.84, 0.20, 0);
+          root.add(outLeft);
+
+          const outRight = createPortArrow(true, 0.20, 0, -Math.PI / 2);
+          outRight.position.set(-0.84, 0.20, 0);
+          root.add(outRight);
+        }
+
+        else if (type === 'miner') {
+          const base = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.24, 1.72), darkSteelMat);
+          base.position.y = 0.12;
+          base.castShadow = true;
+          base.receiveShadow = true;
+          root.add(base);
+
+          const pillarGeo = new THREE.BoxGeometry(0.20, 1.45, 0.20);
+          [[-0.64, -0.64], [0.64, -0.64], [-0.64, 0.64], [0.64, 0.64]].forEach(([px, pz]) => {
+            const p = new THREE.Mesh(pillarGeo, steelMat);
+            p.position.set(px, 0.88, pz);
+            p.castShadow = true;
+            root.add(p);
+          });
+
+          const topDeck = new THREE.Mesh(new THREE.BoxGeometry(1.56, 0.28, 1.56), steelMat);
+          topDeck.position.y = 1.66;
+          topDeck.castShadow = true;
+          root.add(topDeck);
+
+          const drillGroup = new THREE.Group();
+          const drillCone = new THREE.Mesh(new THREE.ConeGeometry(0.32, 1.15, 8), brassMat);
+          drillCone.rotation.x = Math.PI;
+          drillCone.position.y = 0.82;
+          drillCone.castShadow = true;
+          drillGroup.add(drillCone);
+          root.add(drillGroup);
+          root.userData.animParts.drill = drillGroup;
+
+          const gearA = createClockworkGear(0.38, 0.12, 10, brassMat);
+          gearA.position.set(-0.28, 1.86, 0);
+          root.add(gearA);
+          root.userData.animParts.gearA = gearA;
+
+          const gearB = createClockworkGear(0.28, 0.12, 8, copperMat);
+          gearB.position.set(0.34, 1.86, 0);
+          root.add(gearB);
+          root.userData.animParts.gearB = gearB;
+
+          const statusLedMat = new THREE.MeshStandardMaterial({
+            color: 0x10b981,
+            emissive: 0x10b981,
+            emissiveIntensity: 0.9
+          });
+          const statusLed = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 12), statusLedMat);
+          statusLed.position.set(0, 1.98, 0.55);
+          root.add(statusLed);
+          root.userData.animParts.statusLedMat = statusLedMat;
+
+          const chute = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.34, 0.42), brassMat);
+          chute.position.set(0, 0.36, 0.82);
+          root.add(chute);
+          root.add(createPortArrow(true, 0.06, 0.92, 0));
+        }
+
+        else if (type === 'furnace') {
+          const base = new THREE.Mesh(new THREE.BoxGeometry(1.78, 0.24, 1.78), darkSteelMat);
+          base.position.y = 0.12;
+          base.castShadow = true;
+          base.receiveShadow = true;
+          root.add(base);
+
+          const body = new THREE.Mesh(new THREE.BoxGeometry(1.54, 1.25, 1.48), steelMat);
+          body.position.y = 0.84;
+          body.castShadow = true;
+          root.add(body);
+
+          const band = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.14, 1.56), brassMat);
+          band.position.y = 1.22;
+          root.add(band);
+
+          // Spinning side clockwork flywheel
+          const sideGear = createClockworkGear(0.36, 0.10, 10, brassMat);
+          sideGear.rotation.z = Math.PI / 2;
+          sideGear.position.set(0.82, 0.84, 0);
+          root.add(sideGear);
+          root.userData.animParts.sideGear = sideGear;
+
+          const coreMat = new THREE.MeshStandardMaterial({
+            color: 0xff6b00,
+            emissive: 0xff4500,
+            emissiveIntensity: 1.35,
+            roughness: 0.2
+          });
+          const coreWindow = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.44, 1.52), coreMat);
+          coreWindow.position.y = 0.78;
+          root.add(coreWindow);
+          root.userData.animParts.coreMat = coreMat;
+
+          const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.30, 1.35, 12), darkSteelMat);
+          stack.position.set(-0.42, 1.95, -0.35);
+          stack.castShadow = true;
+          root.add(stack);
+
+          const stackRim = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.12, 12), brassMat);
+          stackRim.position.set(-0.42, 2.62, -0.35);
+          root.add(stackRim);
+
+          const chute = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.34, 0.38), brassMat);
+          chute.position.set(0, 0.36, 0.82);
+          root.add(chute);
+
+          // Green IN at rear (-Z) & Orange OUT at front (+Z)
+          root.add(createPortArrow(false, 0.06, -0.92, 0));
+          root.add(createPortArrow(true, 0.06, 0.92, 0));
+        }
+
+        else if (type === 'assembler') {
+          const base = new THREE.Mesh(new THREE.BoxGeometry(1.82, 0.22, 1.82), darkSteelMat);
+          base.position.y = 0.11;
+          base.castShadow = true;
+          base.receiveShadow = true;
+          root.add(base);
+
+          const tableGear = createClockworkGear(0.56, 0.16, 12, brassMat);
+          tableGear.position.y = 0.32;
+          root.add(tableGear);
+          root.userData.animParts.tableGear = tableGear;
+
+          const archLeft = new THREE.Mesh(new THREE.BoxGeometry(0.24, 1.55, 0.32), steelMat);
+          archLeft.position.set(-0.72, 0.92, -0.58);
+          archLeft.castShadow = true;
+          root.add(archLeft);
+
+          const archRight = new THREE.Mesh(new THREE.BoxGeometry(0.24, 1.55, 0.32), steelMat);
+          archRight.position.set(0.72, 0.92, -0.58);
+          archRight.castShadow = true;
+          root.add(archRight);
+
+          const archTop = new THREE.Mesh(new THREE.BoxGeometry(1.74, 0.26, 0.42), steelMat);
+          archTop.position.set(0, 1.72, -0.58);
+          archTop.castShadow = true;
+          root.add(archTop);
+
+          const leftArmGroup = new THREE.Group();
+          leftArmGroup.position.set(-0.68, 1.15, 0.05);
+          const armSegL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.68, 0.14), copperMat);
+          armSegL.position.set(0.18, 0.18, 0);
+          armSegL.rotation.z = -0.55;
+          leftArmGroup.add(armSegL);
+          const clawL = new THREE.Mesh(new THREE.ConeGeometry(0.10, 0.26, 6), brassMat);
+          clawL.position.set(0.38, -0.06, 0);
+          clawL.rotation.z = 2.6;
+          leftArmGroup.add(clawL);
+          root.add(leftArmGroup);
+          root.userData.animParts.leftArm = leftArmGroup;
+
+          const rightArmGroup = new THREE.Group();
+          rightArmGroup.position.set(0.68, 1.15, 0.05);
+          const armSegR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.68, 0.14), copperMat);
+          armSegR.position.set(-0.18, 0.18, 0);
+          armSegR.rotation.z = 0.55;
+          rightArmGroup.add(armSegR);
+          const clawR = new THREE.Mesh(new THREE.ConeGeometry(0.10, 0.26, 6), brassMat);
+          clawR.position.set(-0.38, -0.06, 0);
+          clawR.rotation.z = -2.6;
+          rightArmGroup.add(clawR);
+          root.add(rightArmGroup);
+          root.userData.animParts.rightArm = rightArmGroup;
+
+          const holoMat = new THREE.MeshStandardMaterial({
+            color: 0x22d3ee,
+            emissive: 0x22d3ee,
+            emissiveIntensity: 1.1,
+            transparent: true,
+            opacity: 0.88
+          });
+          const holoCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.24, 0), holoMat);
+          holoCore.position.set(0, 1.12, 0);
+          root.add(holoCore);
+          root.userData.animParts.holoCore = holoCore;
+          root.userData.animParts.holoMat = holoMat;
+
+          const outPort = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.30, 0.36), brassMat);
+          outPort.position.set(0, 0.32, 0.84);
+          root.add(outPort);
+
+          // Green IN at rear (-Z) & Orange OUT at front (+Z)
+          root.add(createPortArrow(false, 0.06, -0.92, 0));
+          root.add(createPortArrow(true, 0.06, 0.92, 0));
+        }
+
+        else if (type === 'generator') {
+          const base = new THREE.Mesh(new THREE.BoxGeometry(1.80, 0.26, 1.80), darkSteelMat);
+          base.position.y = 0.13;
+          base.castShadow = true;
+          base.receiveShadow = true;
+          root.add(base);
+
+          const coilMat = new THREE.MeshStandardMaterial({
+            color: 0x22d3ee,
+            emissive: 0x06b6d4,
+            emissiveIntensity: 1.35,
+            roughness: 0.15
+          });
+          const core = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.40, 1.55, 16), coilMat);
+          core.position.y = 0.95;
+          root.add(core);
+          root.userData.animParts.coilMat = coilMat;
+
+          const topCap = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 12), copperMat);
+          topCap.position.y = 1.76;
+          topCap.castShadow = true;
+          root.add(topCap);
+
+          const ring1 = new THREE.Mesh(new THREE.TorusGeometry(0.50, 0.05, 8, 24), brassMat);
+          ring1.rotation.x = Math.PI / 2;
+          ring1.position.y = 0.72;
+          root.add(ring1);
+          root.userData.animParts.ring1 = ring1;
+
+          const ring2 = new THREE.Mesh(new THREE.TorusGeometry(0.50, 0.05, 8, 24), brassMat);
+          ring2.rotation.x = Math.PI / 2;
+          ring2.position.y = 1.28;
+          root.add(ring2);
+          root.userData.animParts.ring2 = ring2;
+
+          const flyL = createClockworkGear(0.58, 0.14, 12, brassMat);
+          flyL.rotation.z = Math.PI / 2;
+          flyL.position.set(-0.74, 0.92, 0);
+          root.add(flyL);
+          root.userData.animParts.flyL = flyL;
+
+          const flyR = createClockworkGear(0.58, 0.14, 12, brassMat);
+          flyR.rotation.z = Math.PI / 2;
+          flyR.position.set(0.74, 0.92, 0);
+          root.add(flyR);
+          root.userData.animParts.flyR = flyR;
+        }
+
+        else if (type === 'storage') {
+          const base = new THREE.Mesh(new THREE.BoxGeometry(1.80, 0.22, 1.80), darkSteelMat);
+          base.position.y = 0.11;
+          base.castShadow = true;
+          base.receiveShadow = true;
+          root.add(base);
+
+          const vault = new THREE.Mesh(new THREE.BoxGeometry(1.58, 1.48, 1.58), steelMat);
+          vault.position.y = 0.92;
+          vault.castShadow = true;
+          root.add(vault);
+
+          const trimGeo = new THREE.BoxGeometry(0.18, 1.54, 0.18);
+          [[-0.74, -0.74], [0.74, -0.74], [-0.74, 0.74], [0.74, 0.74]].forEach(([tx, tz]) => {
+            const t = new THREE.Mesh(trimGeo, brassMat);
+            t.position.set(tx, 0.92, tz);
+            root.add(t);
+          });
+
+          const ledBars = [];
+          for (let i = 0; i < 10; i++) {
+            const barMat = new THREE.MeshStandardMaterial({
+              color: 0x1e293b,
+              emissive: 0x000000,
+              emissiveIntensity: 0.9
+            });
+            const bar = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.08, 0.06), barMat);
+            bar.position.set(0, 0.42 + i * 0.11, 0.80);
+            root.add(bar);
+            ledBars.push(barMat);
+          }
+          root.userData.animParts.ledBars = ledBars;
+
+          root.add(createPortArrow(false, 0.06, -0.92, 0));
+          root.add(createPortArrow(true, 0.06, 0.92, 0));
+        }
+
+        else if (type === 'overclocker') {
+          const base = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.84, 0.28, 8), darkSteelMat);
+          base.position.y = 0.14;
+          base.castShadow = true;
+          root.add(base);
+
+          const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.36, 2.2, 8), brassMat);
+          spire.position.y = 1.30;
+          spire.castShadow = true;
+          root.add(spire);
+
+          const orbMat = new THREE.MeshStandardMaterial({
+            color: 0x22d3ee,
+            emissive: 0x06b6d4,
+            emissiveIntensity: 1.4,
+            roughness: 0.15
+          });
+          const orb = new THREE.Mesh(new THREE.OctahedronGeometry(0.32, 1), orbMat);
+          orb.position.y = 2.65;
+          root.add(orb);
+          root.userData.animParts.orb = orb;
+
+          const halo = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.045, 8, 28), orbMat);
+          halo.rotation.x = Math.PI / 2;
+          halo.position.y = 2.65;
+          root.add(halo);
+          root.userData.animParts.halo = halo;
+        }
+
+        if (isGhost) {
+          root.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = false;
+              child.receiveShadow = false;
+              child.material = child.material.clone();
+              child.material.transparent = true;
+              child.material.opacity = 0.6;
+            }
+          });
+        }
+
+        return root;
+      }
+
+      // =========================================================================
+      // 6. 3D AI ARCHITECT DRONE & LASER SCANNER BEAM
+      // =========================================================================
+      let aiDroneGroup = null;
+      let aiDroneRotors = [];
+      let aiLaserLine = null;
+      let aiTargetRing = null;
+
+      function initAIDrone3D() {
+        aiDroneGroup = new THREE.Group();
+        aiDroneGroup.position.set(0, 6.2, 0);
+        aiDroneGroup.visible = false;
+
+        const hullMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.85, roughness: 0.25 });
+        const brassMat = new THREE.MeshStandardMaterial({ color: 0xe5a94c, metalness: 0.88, roughness: 0.24 });
+        const cyanGlowMat = new THREE.MeshStandardMaterial({
+          color: 0x22d3ee,
+          emissive: 0x22d3ee,
+          emissiveIntensity: 1.4
+        });
+
+        // Central Sleek Octagonal Chassis
+        const hull = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.45, 0.38, 8), hullMat);
+        hull.castShadow = true;
+        aiDroneGroup.add(hull);
+
+        const brassCrown = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.06, 8, 24), brassMat);
+        brassCrown.rotation.x = Math.PI / 2;
+        brassCrown.position.y = 0.14;
+        aiDroneGroup.add(brassCrown);
+
+        // Glowing AI Optic Eye underneath
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.24, 16, 12), cyanGlowMat);
+        eye.position.y = -0.18;
+        aiDroneGroup.add(eye);
+
+        // 4 Outrigger Thruster Pods
+        const armOffsets = [
+          [0.85, 0.85], [-0.85, 0.85], [0.85, -0.85], [-0.85, -0.85]
+        ];
+        armOffsets.forEach(([ax, az]) => {
+          const strut = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.10, 1.15), brassMat);
+          strut.position.set(ax * 0.5, 0.04, az * 0.5);
+          strut.rotation.y = Math.atan2(ax, az);
+          aiDroneGroup.add(strut);
+
+          const shroud = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.05, 8, 20), hullMat);
+          shroud.rotation.x = Math.PI / 2;
+          shroud.position.set(ax, 0.08, az);
+          aiDroneGroup.add(shroud);
+
+          const rotor = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.02, 0.08), cyanGlowMat);
+          rotor.position.set(ax, 0.09, az);
+          aiDroneGroup.add(rotor);
+          aiDroneRotors.push(rotor);
+        });
+
+        scene.add(aiDroneGroup);
+
+        // Dynamic Construction / Scanning Laser Beam from Drone to Target Tile
+        const laserGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, 6, 0),
+          new THREE.Vector3(0, 0, 0)
+        ]);
+        const laserMat = new THREE.LineBasicMaterial({
+          color: 0x22d3ee,
+          transparent: true,
+          opacity: 0.85
+        });
+        aiLaserLine = new THREE.Line(laserGeo, laserMat);
+        aiLaserLine.visible = false;
+        scene.add(aiLaserLine);
+
+        // Target Tile Holographic Reticle
+        const tRingGeo = new THREE.RingGeometry(0.68, 0.88, 4);
+        tRingGeo.rotateZ(Math.PI / 4);
+        tRingGeo.rotateX(-Math.PI / 2);
+        const tRingMat = new THREE.MeshBasicMaterial({
+          color: 0x22d3ee,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.85
+        });
+        aiTargetRing = new THREE.Mesh(tRingGeo, tRingMat);
+        aiTargetRing.position.y = 0.04;
+        aiTargetRing.visible = false;
+        scene.add(aiTargetRing);
+      }
+
+      // =========================================================================
+      // 7. POOLED PARTICLE SYSTEM (SMOKE, SPARKS, DUST & ARCS)
+      // =========================================================================
+      function initParticlePool() {
+        const geo = new THREE.DodecahedronGeometry(0.12, 0);
+        for (let i = 0; i < MAX_PARTICLES; i++) {
+          const mat = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0
+          });
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.visible = false;
+          particlesGroup.add(mesh);
+          particlePool.push({
+            mesh,
+            active: false,
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            life: 0,
+            maxLife: 1,
+            startScale: 1,
+            endScale: 0.2
+          });
+        }
+      }
+
+      function spawnParticle(x, y, z, vx, vy, vz, colorHex, maxLife, startScale, endScale) {
+        for (let i = 0; i < particlePool.length; i++) {
+          const p = particlePool[i];
+          if (!p.active) {
+            p.active = true;
+            p.mesh.visible = true;
+            p.mesh.position.set(x, y, z);
+            p.mesh.material.color.setHex(colorHex);
+            p.mesh.material.opacity = 0.85;
+            p.mesh.scale.setScalar(startScale);
+            p.vx = vx;
+            p.vy = vy;
+            p.vz = vz;
+            p.life = 0;
+            p.maxLife = maxLife;
+            p.startScale = startScale;
+            p.endScale = endScale;
+            return;
+          }
+        }
+      }
+
+      function updateParticles(dt) {
+        for (let i = 0; i < particlePool.length; i++) {
+          const p = particlePool[i];
+          if (!p.active) continue;
+          p.life += dt;
+          if (p.life >= p.maxLife) {
+            p.active = false;
+            p.mesh.visible = false;
+            continue;
+          }
+          const t = p.life / p.maxLife;
+          p.mesh.position.x += p.vx * dt;
+          p.mesh.position.y += p.vy * dt;
+          p.mesh.position.z += p.vz * dt;
+          const s = p.startScale + (p.endScale - p.startScale) * t;
+          p.mesh.scale.setScalar(s);
+          p.mesh.material.opacity = (1 - t) * 0.78;
+        }
+      }
+
+      // =========================================================================
+      // 8. BUILDING PLACEMENT, SELECTION, ROTATION & DEMOLITION
+      // =========================================================================
+      function isTileEmpty(gx, gz) {
+        return inBounds(gx, gz) && state.grid[gz][gx] === null;
+      }
+
+      function placeBuilding(gx, gz, type, dir, options = {}) {
+        const def = BUILDINGS[type];
+        if (!def) return null;
+        if (!isTileEmpty(gx, gz)) return null;
+
+        const isFreeLoad = Boolean(options.free);
+        const isAI = Boolean(options.isAI);
+
+        if (!isFreeLoad) {
+          if (state.stageIndex < def.unlockStage && !state.sandboxMode) {
+            if (!isAI) {
+              showToast(`${def.name} unlocks at Stage ${def.unlockStage + 1}!`);
+              sound.playError();
+            }
+            return null;
+          }
+          if (state.credits < def.cost) {
+            if (!isAI) {
+              showToast(`Insufficient Credits ($${def.cost} required)`);
+              sound.playError();
+            }
+            return null;
+          }
+          state.credits -= def.cost;
+        }
+
+        const id = options.id || state.nextBuildingId++;
+        if (id >= state.nextBuildingId) state.nextBuildingId = id + 1;
+
+        const veinType = state.veins.get(tileKey(gx, gz)) || null;
+
+        const entity = {
+          id,
+          gx,
+          gz,
+          type,
+          dir: dir % 4,
+          veinType,
+          status: 'IDLE',
+          progress: 0,
+          overclockMult: 1.0,
+          recipeMode: options.recipeMode || 'auto', // 'auto' or specific recipe id
+          activeRecipeId: options.activeRecipeId || null,
+          inputBuffer: options.inputBuffer ? { ...options.inputBuffer } : {},
+          outputBuffer: options.outputBuffer ? { ...options.outputBuffer } : {},
+          storedItems: options.storedItems ? { ...options.storedItems } : {},
+          autoOutput: Boolean(options.autoOutput),
+          rrIndex: options.rrIndex || 0,
+          items: [],
+          splitterItem: null,
+          mesh: null
+        };
+
+        const mesh = createBuildingMesh(type, false);
+        const wPos = gridToWorld(gx, gz);
+        mesh.position.set(wPos.x, 0, wPos.z);
+        mesh.rotation.y = entity.dir * (Math.PI / 2);
+        buildingsGroup.add(mesh);
+        entity.mesh = mesh;
+
+        state.grid[gz][gx] = entity;
+        state.buildings.set(id, entity);
+
+        if (!isFreeLoad) {
+          state.stats.buildingsPlaced += 1;
+          sound.playPlace(isAI);
+          if (isAI) {
+            spawnWorldFloatText(`-$${def.cost}`, wPos.x, 1.8, wPos.z, '#22d3ee');
+          }
+        }
+
+        recomputeOverclockBonuses();
+        if (type === 'generator' || type === 'overclocker') {
+          rebuildPowerConduitLines();
+        }
+
+        updateHUD();
+        return entity;
+      }
+
+      function removeBuilding(building) {
+        if (!building) return;
+
+        if (building.items && building.items.length > 0) {
+          building.items.forEach((it) => {
+            if (it.mesh) itemsGroup.remove(it.mesh);
+          });
+          building.items = [];
+        }
+        if (building.splitterItem && building.splitterItem.mesh) {
+          itemsGroup.remove(building.splitterItem.mesh);
+          building.splitterItem = null;
+        }
+        if (building.mesh) {
+          buildingsGroup.remove(building.mesh);
+        }
+
+        state.grid[building.gz][building.gx] = null;
+        state.buildings.delete(building.id);
+
+        const def = BUILDINGS[building.type];
+        const refund = Math.floor(def.cost * 0.75);
+        state.credits += refund;
+
+        const wPos = gridToWorld(building.gx, building.gz);
+        spawnWorldFloatText(`+$${refund}`, wPos.x, 1.4, wPos.z, '#fbbf24');
+        sound.playDelete();
+
+        if (state.selectedBuildingId === building.id) {
+          selectBuilding(null);
+        }
+
+        recomputeOverclockBonuses();
+        if (building.type === 'generator' || building.type === 'overclocker') {
+          rebuildPowerConduitLines();
+        }
+
+        updateHUD();
+      }
+
+      function rotateBuilding(building) {
+        if (!building) return;
+        building.dir = (building.dir + 1) % 4;
+        if (building.mesh) {
+          building.mesh.rotation.y = building.dir * (Math.PI / 2);
+        }
+        sound.playRotate();
+        updateInspector();
+      }
+
+      function selectBuilding(building) {
+        if (!building) {
+          state.selectedBuildingId = null;
+          selectionRingMesh.visible = false;
+          document.getElementById('inspector-panel').classList.add('hidden');
+          return;
+        }
+        state.selectedBuildingId = building.id;
+        const wPos = gridToWorld(building.gx, building.gz);
+        selectionRingMesh.position.set(wPos.x, 0.03, wPos.z);
+        selectionRingMesh.visible = true;
+        document.getElementById('inspector-panel').classList.remove('hidden');
+        updateInspector();
+      }
+
+      function setActiveTool(toolType) {
+        if (toolType !== null) {
+          const def = BUILDINGS[toolType];
+          if (def && state.stageIndex < def.unlockStage && !state.sandboxMode) {
+            showToast(`${def.name} unlocks at Stage ${def.unlockStage + 1}`);
+            sound.playError();
+            return;
+          }
+        }
+        state.activeTool = toolType;
+        if (toolType !== null) {
+          selectBuilding(null);
+        }
+        updateHotbarUI();
+        updateGhostPreview();
+      }
+
+      function recomputeOverclockBonuses() {
+        state.buildings.forEach((b) => {
+          b.overclockMult = 1.0;
+        });
+
+        state.buildings.forEach((occ) => {
+          if (occ.type !== 'overclocker') return;
+          for (let dz = -1; dz <= 1; dz++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              if (dx === 0 && dz === 0) continue;
+              const neighbor = getBuildingAt(occ.gx + dx, occ.gz + dz);
+              if (neighbor && ['miner', 'furnace', 'assembler'].includes(neighbor.type)) {
+                neighbor.overclockMult = Math.min(1.70, neighbor.overclockMult + 0.35);
+              }
+            }
+          }
+        });
+      }
+
+      function rebuildPowerConduitLines() {
+        while (conduitsGroup.children.length > 0) {
+          conduitsGroup.remove(conduitsGroup.children[0]);
+        }
+        const nodes = [];
+        state.buildings.forEach((b) => {
+          if (b.type === 'generator' || b.type === 'overclocker') {
+            nodes.push(b);
+          }
+        });
+        if (nodes.length === 0) return;
+
+        const lineMat = new THREE.LineBasicMaterial({
+          color: 0x22d3ee,
+          transparent: true,
+          opacity: 0.45
+        });
+
+        for (let i = 0; i < nodes.length; i++) {
+          for (let j = i + 1; j < nodes.length; j++) {
+            const a = nodes[i];
+            const b = nodes[j];
+            if (Math.hypot(a.gx - b.gx, a.gz - b.gz) <= 12) {
+              const pa = gridToWorld(a.gx, a.gz);
+              const pb = gridToWorld(b.gx, b.gz);
+              const yA = a.type === 'overclocker' ? 2.6 : 1.7;
+              const yB = b.type === 'overclocker' ? 2.6 : 1.7;
+              const pts = [
+                new THREE.Vector3(pa.x, yA, pa.z),
+                new THREE.Vector3((pa.x + pb.x) / 2, Math.min(yA, yB) - 0.25, (pa.z + pb.z) / 2),
+                new THREE.Vector3(pb.x, yB, pb.z)
+              ];
+              const geo = new THREE.BufferGeometry().setFromPoints(pts);
+              conduitsGroup.add(new THREE.Line(geo, lineMat));
+            }
+          }
+        }
+      }
+
+      // =========================================================================
+      // 9. REAL-TIME LOGISTICS & MACHINE PRODUCTION SIMULATION
+      // =========================================================================
+      function recordProduction(itemType) {
+        state.stats.produced[itemType] = (state.stats.produced[itemType] || 0) + 1;
+        if (state.productionLog[itemType]) {
+          state.productionLog[itemType].push(state.simTime);
+        }
+      }
+
+      function getProductionRatePerMin(itemType) {
+        const log = state.productionLog[itemType];
+        if (!log) return 0;
+        const windowSec = 30.0;
+        const cutoff = state.simTime - windowSec;
+        while (log.length > 0 && log[0] < cutoff) {
+          log.shift();
+        }
+        return Math.round((log.length / windowSec) * 60);
+      }
+
+      function getTotalBufferCount(bufferObj) {
+        let sum = 0;
+        for (const k in bufferObj) {
+          sum += bufferObj[k] || 0;
+        }
+        return sum;
+      }
+
+      function canTargetAcceptItem(target, itemType, entryFromDir) {
+        if (!target) return false;
+
+        if (target.type === 'conveyor') {
+          if (entryFromDir === target.dir) return false;
+          if (target.items.length === 0) return true;
+          const tailItem = target.items[target.items.length - 1];
+          return tailItem.progress >= MIN_SPACING;
+        }
+
+        if (target.type === 'splitter') {
+          const rearDir = (target.dir + 2) % 4;
+          if (entryFromDir !== rearDir) return false;
+          return target.splitterItem === null;
+        }
+
+        if (target.type === 'furnace') {
+          if (entryFromDir === target.dir) return false;
+          if (itemType !== 'ore' && itemType !== 'crystal') return false;
+          // Keep furnace focused on one input type at a time unless empty
+          if ((target.inputBuffer.ore || 0) > 0 && itemType !== 'ore') return false;
+          if ((target.inputBuffer.crystal || 0) > 0 && itemType !== 'crystal') return false;
+          return ((target.inputBuffer[itemType] || 0) < 5);
+        }
+
+        if (target.type === 'assembler') {
+          if (entryFromDir === target.dir) return false;
+          if (target.recipeMode === 'auto') {
+            const validAutoInputs = ['ore', 'metal', 'energy_cell', 'circuit'];
+            if (!validAutoInputs.includes(itemType)) return false;
+            return (target.inputBuffer[itemType] || 0) < 6;
+          } else {
+            const rec = ASSEMBLER_RECIPES[target.recipeMode];
+            if (!rec || !rec.inputs[itemType]) return false;
+            return (target.inputBuffer[itemType] || 0) < 6;
+          }
+        }
+
+        if (target.type === 'storage') {
+          if (target.autoOutput && entryFromDir === target.dir) return false;
+          return getTotalBufferCount(target.storedItems) < 150;
+        }
+
+        return false;
+      }
+
+      function insertItemIntoTarget(target, itemObj, entryFromDir) {
+        if (target.type === 'conveyor') {
+          const item = {
+            type: itemObj.type,
+            progress: 0.02,
+            entryFromDir,
+            fromStorage: Boolean(itemObj.fromStorage),
+            mesh: itemObj.mesh || createItemMesh(itemObj.type)
+          };
+          target.items.push(item);
+          updateBeltItemVisual(target, item);
+          return true;
+        }
+
+        if (target.type === 'splitter') {
+          const wPos = gridToWorld(target.gx, target.gz);
+          const mesh = itemObj.mesh || createItemMesh(itemObj.type);
+          mesh.position.set(wPos.x, 0.75, wPos.z);
+          target.splitterItem = {
+            type: itemObj.type,
+            fromStorage: Boolean(itemObj.fromStorage),
+            mesh
+          };
+          return true;
+        }
+
+        if (itemObj.mesh) {
+          itemsGroup.remove(itemObj.mesh);
+        }
+
+        if (target.type === 'furnace' || target.type === 'assembler') {
+          target.inputBuffer[itemObj.type] = (target.inputBuffer[itemObj.type] || 0) + 1;
+          return true;
+        }
+
+        if (target.type === 'storage') {
+          target.storedItems[itemObj.type] = (target.storedItems[itemObj.type] || 0) + 1;
+          if (!itemObj.fromStorage) {
+            state.stats.storedTotal[itemObj.type] = (state.stats.storedTotal[itemObj.type] || 0) + 1;
+            const reward = ITEMS[itemObj.type].creditValue;
+            state.credits += reward;
+            state.totalCreditsEarned += reward;
+            const wPos = gridToWorld(target.gx, target.gz);
+            spawnWorldFloatText(`+$${reward}`, wPos.x, 1.85, wPos.z, '#34d399');
+          }
+          return true;
+        }
+
+        return false;
+      }
+
+      function tryEjectFromPort(building, outDir, itemType, fromStorage = false) {
+        const vec = DIR_VECTORS[outDir];
+        const neighbor = getBuildingAt(building.gx + vec.dx, building.gz + vec.dz);
+        if (!neighbor) return false;
+
+        const entryFromDir = (outDir + 2) % 4;
+        if (!canTargetAcceptItem(neighbor, itemType, entryFromDir)) return false;
+
+        return insertItemIntoTarget(neighbor, { type: itemType, mesh: null, fromStorage }, entryFromDir);
+      }
+
+      function updateBeltItemVisual(belt, item) {
+        const wPos = gridToWorld(belt.gx, belt.gz);
+        const outVec = DIR_VECTORS[belt.dir];
+        const t = item.progress;
+
+        let x = wPos.x + outVec.dx * (t - 0.5) * TILE_SIZE;
+        let z = wPos.z + outVec.dz * (t - 0.5) * TILE_SIZE;
+
+        if (item.entryFromDir !== undefined && item.entryFromDir !== null) {
+          const expectedStraightEntry = (belt.dir + 2) % 4;
+          if (item.entryFromDir !== expectedStraightEntry && t < 0.5) {
+            const entryVec = DIR_VECTORS[item.entryFromDir];
+            const blend = 1 - (t / 0.5);
+            const entryX = wPos.x + entryVec.dx * (TILE_SIZE * 0.5);
+            const entryZ = wPos.z + entryVec.dz * (TILE_SIZE * 0.5);
+            x = x * (1 - blend) + entryX * blend;
+            z = z * (1 - blend) + entryZ * blend;
+          }
+        }
+
+        item.mesh.position.set(x, 0.33, z);
+        item.mesh.rotation.y += 0.03;
+      }
+
+      function selectAssemblerRecipe(b) {
+        if (b.recipeMode !== 'auto') {
+          const rec = ASSEMBLER_RECIPES[b.recipeMode];
+          if (!rec) return null;
+          for (const [ing, qty] of Object.entries(rec.inputs)) {
+            if ((b.inputBuffer[ing] || 0) < qty) return null;
+          }
+          return rec;
+        }
+
+        // Auto-Recipe Mode: prioritize highest-tier craftable recipe from buffered inputs
+        for (const recId of RECIPE_PRIORITY) {
+          const rec = ASSEMBLER_RECIPES[recId];
+          let ok = true;
+          for (const [ing, qty] of Object.entries(rec.inputs)) {
+            if ((b.inputBuffer[ing] || 0) < qty) {
+              ok = false;
+              break;
+            }
+          }
+          if (ok) return rec;
+        }
+        return null;
+      }
+
+      function stepSimulation(dt) {
+        if (state.paused) return;
+
+        const effDt = dt * state.simSpeed;
+        state.simTime += effDt;
+
+        // 1. Power Calculation (Base 40W + 120W per Generator; Active = 100% draw, Idle = 20% draw)
+        let supply = BASE_POWER_W;
+        let demand = 0;
+
+        state.buildings.forEach((b) => {
+          const def = BUILDINGS[b.type];
+          if (def.powerGen > 0) {
+            supply += def.powerGen;
+          }
+          if (def.powerDraw > 0) {
+            const isActiveDraw = (b.status === 'ACTIVE' || b.status === 'LOW POWER') ||
+              b.type === 'conveyor' || b.type === 'splitter' || b.type === 'overclocker';
+            demand += isActiveDraw ? def.powerDraw : def.powerDraw * 0.20;
+          }
+        });
+
+        state.powerSupply = supply;
+        state.powerDemand = demand;
+        state.powerEfficiency = demand <= 0 ? 1.0 : Math.min(1.0, supply / demand);
+        const pEff = state.powerEfficiency;
+
+        // 2. Conveyors & 3-Way Splitters
+        state.buildings.forEach((b) => {
+          if (b.type === 'conveyor') {
+            b.status = pEff < 0.85 ? 'LOW POWER' : 'ACTIVE';
+            const moveDist = BELT_SPEED * pEff * effDt;
+
+            for (let i = 0; i < b.items.length; i++) {
+              const item = b.items[i];
+              let maxProgress = 1.0;
+              if (i > 0) {
+                maxProgress = Math.max(0, b.items[i - 1].progress - MIN_SPACING);
+              }
+              item.progress = Math.min(item.progress + moveDist, maxProgress);
+
+              if (i === 0 && item.progress >= 1.0) {
+                const vec = DIR_VECTORS[b.dir];
+                const neighbor = getBuildingAt(b.gx + vec.dx, b.gz + vec.dz);
+                const entryFromDir = (b.dir + 2) % 4;
+                if (neighbor && canTargetAcceptItem(neighbor, item.type, entryFromDir)) {
+                  b.items.shift();
+                  i -= 1;
+                  insertItemIntoTarget(neighbor, item, entryFromDir);
+                  continue;
+                } else {
+                  item.progress = 1.0;
+                }
+              }
+              updateBeltItemVisual(b, item);
+            }
+          }
+
+          else if (b.type === 'splitter') {
+            b.status = pEff < 0.85 ? 'LOW POWER' : (b.splitterItem ? 'ACTIVE' : 'IDLE');
+            if (b.splitterItem && pEff > 0.01) {
+              // Round-robin: Front (0), Left (+1), Right (+3)
+              const relOffsets = [0, 1, 3];
+              for (let attempt = 0; attempt < 3; attempt++) {
+                const idx = (b.rrIndex + attempt) % 3;
+                const outDir = (b.dir + relOffsets[idx]) % 4;
+                const vec = DIR_VECTORS[outDir];
+                const neighbor = getBuildingAt(b.gx + vec.dx, b.gz + vec.dz);
+                const entryFromDir = (outDir + 2) % 4;
+                if (neighbor && canTargetAcceptItem(neighbor, b.splitterItem.type, entryFromDir)) {
+                  const held = b.splitterItem;
+                  b.splitterItem = null;
+                  b.rrIndex = (idx + 1) % 3;
+                  insertItemIntoTarget(neighbor, held, entryFromDir);
+                  break;
+                }
+              }
+            }
+          }
+        });
+
+        // 3. Miners, Furnaces, Assemblers, Generators, Storage & Overclockers
+        state.buildings.forEach((b) => {
+          const speedBoost = b.overclockMult || 1.0;
+
+          if (b.type === 'miner') {
+            const yieldType = b.veinType === 'crystal' ? 'crystal' : 'ore';
+            if ((b.outputBuffer[yieldType] || 0) > 0) {
+              if (tryEjectFromPort(b, b.dir, yieldType, false)) {
+                b.outputBuffer[yieldType] -= 1;
+              }
+            }
+            if ((b.outputBuffer[yieldType] || 0) >= 3) {
+              b.status = 'BLOCKED';
+              return;
+            }
+            b.status = pEff < 0.85 ? 'LOW POWER' : 'ACTIVE';
+            // Vein = 1.5s cycle; Blank floor = 2.5s cycle (0.6x rate)
+            const baseCycle = b.veinType ? 1.5 : 2.5;
+            b.progress += (effDt * pEff * speedBoost) / baseCycle;
+            if (b.progress >= 1.0) {
+              b.progress -= 1.0;
+              b.outputBuffer[yieldType] = (b.outputBuffer[yieldType] || 0) + 1;
+              recordProduction(yieldType);
+            }
+          }
+
+          else if (b.type === 'furnace') {
+            // Eject any finished Metal or Energy Cells
+            for (const outT of ['metal', 'energy_cell']) {
+              if ((b.outputBuffer[outT] || 0) > 0) {
+                if (tryEjectFromPort(b, b.dir, outT, false)) {
+                  b.outputBuffer[outT] -= 1;
+                }
+              }
+            }
+            if (((b.outputBuffer.metal || 0) + (b.outputBuffer.energy_cell || 0)) >= 5) {
+              b.status = 'BLOCKED';
+              return;
+            }
+
+            if (b.progress === 0) {
+              if ((b.inputBuffer.ore || 0) >= 1) {
+                b.inputBuffer.ore -= 1;
+                b.activeRecipeId = 'metal';
+              } else if ((b.inputBuffer.crystal || 0) >= 1) {
+                b.inputBuffer.crystal -= 1;
+                b.activeRecipeId = 'energy_cell';
+              } else {
+                b.status = 'STARVED';
+                b.activeRecipeId = null;
+                return;
+              }
+            }
+
+            b.status = pEff < 0.85 ? 'LOW POWER' : 'ACTIVE';
+            b.progress += (effDt * pEff * speedBoost) / 2.0;
+            if (b.progress >= 1.0) {
+              b.progress = 0;
+              const outType = b.activeRecipeId || 'metal';
+              b.outputBuffer[outType] = (b.outputBuffer[outType] || 0) + 1;
+              recordProduction(outType);
+            }
+          }
+
+          else if (b.type === 'assembler') {
+            // Eject any finished output
+            for (const outT of ['robot_component', 'circuit', 'energy_cell']) {
+              if ((b.outputBuffer[outT] || 0) > 0) {
+                if (tryEjectFromPort(b, b.dir, outT, false)) {
+                  b.outputBuffer[outT] -= 1;
+                }
+              }
+            }
+            const totalOut = (b.outputBuffer.robot_component || 0) + (b.outputBuffer.circuit || 0) + (b.outputBuffer.energy_cell || 0);
+            if (totalOut >= 5) {
+              b.status = 'BLOCKED';
+              return;
+            }
+
+            if (b.progress === 0) {
+              const chosen = selectAssemblerRecipe(b);
+              if (!chosen) {
+                b.status = 'STARVED';
+                b.activeRecipeId = b.recipeMode === 'auto' ? null : b.recipeMode;
+                return;
+              }
+              b.activeRecipeId = chosen.id;
+              for (const [ing, qty] of Object.entries(chosen.inputs)) {
+                b.inputBuffer[ing] -= qty;
+              }
+            }
+
+            const rec = ASSEMBLER_RECIPES[b.activeRecipeId] || ASSEMBLER_RECIPES.circuit;
+            b.status = pEff < 0.85 ? 'LOW POWER' : 'ACTIVE';
+            b.progress += (effDt * pEff * speedBoost) / rec.duration;
+            if (b.progress >= 1.0) {
+              b.progress = 0;
+              b.outputBuffer[rec.output] = (b.outputBuffer[rec.output] || 0) + rec.outputCount;
+              recordProduction(rec.output);
+            }
+          }
+
+          else if (b.type === 'generator') {
+            b.status = 'ACTIVE';
+          }
+
+          else if (b.type === 'storage') {
+            const total = getTotalBufferCount(b.storedItems);
+            b.status = total >= 150 ? 'BLOCKED' : 'ACTIVE';
+            if (b.autoOutput && total > 0 && pEff > 0.01) {
+              for (const itemType of ITEM_ORDER) {
+                if ((b.storedItems[itemType] || 0) > 0) {
+                  if (tryEjectFromPort(b, b.dir, itemType, true)) {
+                    b.storedItems[itemType] -= 1;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+
+          else if (b.type === 'overclocker') {
+            b.status = pEff < 0.85 ? 'LOW POWER' : 'ACTIVE';
+          }
+        });
+
+        // 4. Campaign Progression
+        checkCampaignProgress();
+      }
+
+      // =========================================================================
+      // 10. AUTONOMOUS AI AUTO-PLAY ENGINE ("AI AUTOPILOT")
+      // =========================================================================
+      const aiAgent = {
+        enabled: false,
+        followCamera: false,
+        actionQueue: [],      // Ordered list of { type, gx, gz, dir, recipeMode, autoOutput, note }
+        dronePos: new THREE.Vector3(0, 6.2, 0),
+        droneTargetPos: new THREE.Vector3(0, 6.2, 0),
+        laserTargetPos: null,
+        laserTimer: 0,
+        decisionTimer: 0,
+        buildCooldown: 0,
+        phaseLabel: 'STANDBY',
+        currentActionText: 'Press [P] or click AI AUTO-PLAY to engage',
+        plannedLines: [],     // Track completed AI line blueprints
+        lineCounter: 0,
+        logs: []
+      };
+
+      function logAIDecision(msg) {
+        const mins = String(Math.floor(state.simTime / 60)).padStart(2, '0');
+        const secs = String(Math.floor(state.simTime % 60)).padStart(2, '0');
+        const entry = `[${mins}:${secs}] ${msg}`;
+        aiAgent.logs.unshift(entry);
+        if (aiAgent.logs.length > 28) aiAgent.logs.pop();
+
+        const logBox = document.getElementById('ai-decision-log');
+        if (logBox) {
+          logBox.innerHTML = aiAgent.logs
+            .map((line, idx) => `<div class="${idx === 0 ? 'text-cyan-300 font-semibold' : 'text-slate-400'}">${line}</div>`)
+            .join('');
+        }
+      }
+
+      function toggleAIAutoPlay(forceState = null) {
+        const next = forceState !== null ? forceState : !aiAgent.enabled;
+        aiAgent.enabled = next;
+
+        const btn = document.getElementById('btn-ai-toggle');
+        const dot = document.getElementById('ai-status-dot');
+        const lbl = document.getElementById('ai-toggle-label');
+        const brainLed = document.getElementById('ai-brain-led');
+
+        if (next) {
+          setActiveTool(null);
+          btn.className = 'px-3 py-1.5 rounded-lg bg-cyan-500/25 hover:bg-cyan-500/35 border border-cyan-400 text-xs font-display font-bold tracking-wider text-cyan-200 flex items-center gap-2 transition ai-active-glow';
+          dot.className = 'w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping';
+          lbl.textContent = 'AI AUTO-PLAY: ON';
+          brainLed.className = 'w-2 h-2 rounded-full bg-cyan-400 animate-pulse';
+          aiDroneGroup.visible = true;
+          aiAgent.phaseLabel = 'ANALYZING';
+          aiAgent.currentActionText = 'Scanning platform topology & resource veins...';
+          logAIDecision('AI Autopilot ENGAGED. Evaluating factory blueprint...');
+          showToast('AI Autopilot Engaged');
+        } else {
+          btn.className = 'px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-display font-bold tracking-wider text-slate-200 flex items-center gap-2 transition';
+          dot.className = 'w-2.5 h-2.5 rounded-full bg-slate-500';
+          lbl.textContent = 'AI AUTO-PLAY: OFF';
+          brainLed.className = 'w-2 h-2 rounded-full bg-slate-500';
+          aiLaserLine.visible = false;
+          aiTargetRing.visible = false;
+          aiAgent.phaseLabel = 'STANDBY';
+          aiAgent.currentActionText = 'Manual control active. Press [P] to resume AI.';
+          logAIDecision('AI Autopilot disengaged. Control handed to operator.');
+          showToast('AI Autopilot Disengaged');
+        }
+        sound.playClick();
+        updateAIBrainHUD();
+      }
+
+      // Compute direction 0..3 from (x1,z1) to adjacent (x2,z2)
+      function getStepDir(x1, z1, x2, z2) {
+        const dx = x2 - x1;
+        const dz = z2 - z1;
+        if (dz === 1) return 0;
+        if (dx === 1) return 1;
+        if (dz === -1) return 2;
+        return 3;
+      }
+
+      // Check if a tile is reserved in the current AI action queue
+      function isTileQueued(gx, gz) {
+        return aiAgent.actionQueue.some((op) => op.gx === gx && op.gz === gz);
+      }
+
+      function isTileAvailableForAI(gx, gz, allowVeins = false) {
+        if (!inBounds(gx, gz)) return false;
+        if (state.grid[gz][gx] !== null) return false;
+        if (isTileQueued(gx, gz)) return false;
+        if (!allowVeins && state.veins.has(tileKey(gx, gz))) return false;
+        return true;
+      }
+
+      // A* Grid Pathfinding for Conveyor Routing
+      function findConveyorPath(startX, startZ, goalX, goalZ, finalOutDir, extraBlockedSet = new Set()) {
+        if (!inBounds(startX, startZ) || !inBounds(goalX, goalZ)) return null;
+        if (!isTileAvailableForAI(startX, startZ, true) && !(startX === goalX && startZ === goalZ)) return null;
+
+        const open = [];
+        const gScore = new Map();
+        const cameFrom = new Map();
+
+        const startKey = tileKey(startX, startZ);
+        gScore.set(startKey, 0);
+        open.push({
+          gx: startX,
+          gz: startZ,
+          dir: -1,
+          f: Math.abs(goalX - startX) + Math.abs(goalZ - startZ)
+        });
+
+        let iterations = 0;
+        while (open.length > 0 && iterations < 900) {
+          iterations++;
+          open.sort((a, b) => a.f - b.f);
+          const cur = open.shift();
+          const curKey = tileKey(cur.gx, cur.gz);
+
+          if (cur.gx === goalX && cur.gz === goalZ) {
+            // Reconstruct ordered conveyor steps
+            const coords = [];
+            let traceKey = curKey;
+            while (traceKey) {
+              const [px, pz] = traceKey.split(',').map(Number);
+              coords.unshift({ gx: px, gz: pz });
+              traceKey = cameFrom.get(traceKey);
+            }
+
+            const steps = [];
+            for (let i = 0; i < coords.length; i++) {
+              const c = coords[i];
+              let dir = finalOutDir;
+              if (i < coords.length - 1) {
+                dir = getStepDir(c.gx, c.gz, coords[i + 1].gx, coords[i + 1].gz);
+              }
+              steps.push({ type: 'conveyor', gx: c.gx, gz: c.gz, dir });
+            }
+            return steps;
+          }
+
+          for (let d = 0; d < 4; d++) {
+            const nx = cur.gx + DIR_VECTORS[d].dx;
+            const nz = cur.gz + DIR_VECTORS[d].dz;
+            if (!inBounds(nx, nz)) continue;
+
+            const nKey = tileKey(nx, nz);
+            if (extraBlockedSet.has(nKey)) continue;
+            if (state.grid[nz][nx] !== null) continue;
+            if (isTileQueued(nx, nz)) continue;
+
+            // Penalize crossing unmined resource veins & turns so belts route cleanly
+            const veinPenalty = state.veins.has(nKey) ? 6 : 0;
+            const turnPenalty = (cur.dir !== -1 && cur.dir !== d) ? 0.4 : 0;
+            const tentativeG = (gScore.get(curKey) || 0) + 1 + veinPenalty + turnPenalty;
+
+            if (tentativeG < (gScore.get(nKey) ?? Infinity)) {
+              cameFrom.set(nKey, curKey);
+              gScore.set(nKey, tentativeG);
+              const h = Math.abs(goalX - nx) + Math.abs(goalZ - nz);
+              open.push({ gx: nx, gz: nz, dir: d, f: tentativeG + h });
+            }
+          }
+        }
+
+        return null;
+      }
+
+      // Find a clean perimeter tile for a Power Generator
+      function planGeneratorPlacement() {
+        const candidates = [];
+        for (let x = 1; x < GRID_SIZE - 1; x++) {
+          candidates.push({ gx: x, gz: 0 });
+          candidates.push({ gx: x, gz: GRID_SIZE - 1 });
+        }
+        for (let z = 1; z < GRID_SIZE - 1; z++) {
+          candidates.push({ gx: 0, gz: z });
+          candidates.push({ gx: GRID_SIZE - 1, gz: z });
+        }
+        for (const c of candidates) {
+          if (isTileAvailableForAI(c.gx, c.gz, false)) {
+            return { type: 'generator', gx: c.gx, gz: c.gz, dir: 0, note: 'Power Grid Generator' };
+          }
+        }
+        return null;
+      }
+
+      // Find an available resource vein ('ore' or 'crystal') with an open exit port
+      function findOpenVein(veinType, preferredNear = { gx: 12, gz: 12 }) {
+        const matches = [];
+        state.veins.forEach((vType, key) => {
+          if (vType !== veinType) return;
+          const [gx, gz] = key.split(',').map(Number);
+          if (!isTileAvailableForAI(gx, gz, true)) return;
+
+          // Check which exit direction has clear open workspace
+          let bestDir = -1;
+          let bestSpace = -1;
+          for (let d = 0; d < 4; d++) {
+            const ox = gx + DIR_VECTORS[d].dx;
+            const oz = gz + DIR_VECTORS[d].dz;
+            if (!isTileAvailableForAI(ox, oz, false)) continue;
+            // Count free neighbors around exit
+            let freeCount = 0;
+            for (let r = -2; r <= 2; r++) {
+              for (let c = -2; c <= 2; c++) {
+                if (isTileAvailableForAI(ox + c, oz + r, false)) freeCount++;
+              }
+            }
+            if (freeCount > bestSpace) {
+              bestSpace = freeCount;
+              bestDir = d;
+            }
+          }
+          if (bestDir !== -1) {
+            const dist = Math.hypot(gx - preferredNear.gx, gz - preferredNear.gz);
+            matches.push({ gx, gz, outDir: bestDir, dist });
+          }
+        });
+
+        matches.sort((a, b) => a.dist - b.dist);
+        return matches[0] || null;
+      }
+
+      // Find a clear machine pad near a reference point with free rear & front ports
+      function findClearMachineSpot(nearX, nearZ, preferredDir = 0, radius = 7) {
+        const candidates = [];
+        for (let dz = -radius; dz <= radius; dz++) {
+          for (let dx = -radius; dx <= radius; dx++) {
+            const gx = nearX + dx;
+            const gz = nearZ + dz;
+            if (gx < 2 || gx > GRID_SIZE - 3 || gz < 2 || gz > GRID_SIZE - 3) continue;
+            if (!isTileAvailableForAI(gx, gz, false)) continue;
+
+            for (let offset = 0; offset < 4; offset++) {
+              const dir = (preferredDir + offset) % 4;
+              const fVec = DIR_VECTORS[dir];
+              const rVec = DIR_VECTORS[(dir + 2) % 4];
+              const fx = gx + fVec.dx;
+              const fz = gz + fVec.dz;
+              const rx = gx + rVec.dx;
+              const rz = gz + rVec.dz;
+
+              if (isTileAvailableForAI(fx, fz, false) && isTileAvailableForAI(rx, rz, false)) {
+                candidates.push({
+                  gx,
+                  gz,
+                  dir,
+                  frontX: fx,
+                  frontZ: fz,
+                  rearX: rx,
+                  rearZ: rz,
+                  dist: Math.hypot(dx, dz)
+                });
+                break;
+              }
+            }
+          }
+        }
+        candidates.sort((a, b) => a.dist - b.dist);
+        return candidates[0] || null;
+      }
+
+      // Plan a complete Smelting Line: Miner (Ore/Crystal) -> Conveyors -> Furnace -> Conveyors -> Storage
+      function planSmeltingLine(veinType, autoOutputStorage = true) {
+        const vein = findOpenVein(veinType);
+        if (!vein) return false;
+
+        const mOutX = vein.gx + DIR_VECTORS[vein.outDir].dx;
+        const mOutZ = vein.gz + DIR_VECTORS[vein.outDir].dz;
+
+        // Place Furnace 3 tiles forward from Miner
+        const fCenterX = vein.gx + DIR_VECTORS[vein.outDir].dx * 4;
+        const fCenterZ = vein.gz + DIR_VECTORS[vein.outDir].dz * 4;
+        const fSpot = findClearMachineSpot(fCenterX, fCenterZ, vein.outDir, 5);
+        if (!fSpot) return false;
+
+        // Place Storage 3 tiles forward from Furnace
+        const sCenterX = fSpot.gx + DIR_VECTORS[fSpot.dir].dx * 4;
+        const sCenterZ = fSpot.gz + DIR_VECTORS[fSpot.dir].dz * 4;
+        const sSpot = findClearMachineSpot(sCenterX, sCenterZ, fSpot.dir, 5);
+        if (!sSpot) return false;
+
+        const blocked = new Set([
+          tileKey(vein.gx, vein.gz),
+          tileKey(fSpot.gx, fSpot.gz),
+          tileKey(sSpot.gx, sSpot.gz)
+        ]);
+
+        const belt1 = findConveyorPath(mOutX, mOutZ, fSpot.rearX, fSpot.rearZ, fSpot.dir, blocked);
+        if (!belt1) return false;
+        belt1.forEach((b) => blocked.add(tileKey(b.gx, b.gz)));
+
+        const belt2 = findConveyorPath(fSpot.frontX, fSpot.frontZ, sSpot.rearX, sSpot.rearZ, sSpot.dir, blocked);
+        if (!belt2) return false;
+
+        const label = veinType === 'crystal' ? 'Crystal → Energy Cell Line' : 'Ore → Metal Smelting Line';
+        aiAgent.lineCounter += 1;
+        const lineId = aiAgent.lineCounter;
+
+        aiAgent.actionQueue.push({ type: 'miner', gx: vein.gx, gz: vein.gz, dir: vein.outDir, note: `${label} #${lineId}: Miner` });
+        aiAgent.actionQueue.push({ type: 'furnace', gx: fSpot.gx, gz: fSpot.gz, dir: fSpot.dir, note: `${label} #${lineId}: Furnace` });
+        aiAgent.actionQueue.push({
+          type: 'storage',
+          gx: sSpot.gx,
+          gz: sSpot.gz,
+          dir: sSpot.dir,
+          autoOutput: autoOutputStorage,
+          note: `${label} #${lineId}: Vault`
+        });
+        belt1.forEach((b) => aiAgent.actionQueue.push({ ...b, note: `${label} #${lineId}: Feed Belt` }));
+        belt2.forEach((b) => aiAgent.actionQueue.push({ ...b, note: `${label} #${lineId}: Output Belt` }));
+
+        aiAgent.plannedLines.push({
+          kind: veinType === 'crystal' ? 'cell_line' : 'metal_line',
+          storageGx: sSpot.gx,
+          storageGz: sSpot.gz,
+          storageDir: sSpot.dir
+        });
+
+        logAIDecision(`Planned ${label} #${lineId} (${3 + belt1.length + belt2.length} structures).`);
+        return true;
+      }
+
+      // Plan a Dual-Input Assembler Line:
+      // Feeds Ingredient A (from sourceA storage) into Assembler Left/Rear port & Ingredient B (from sourceB storage) into Right/Rear port -> Output Storage
+      function planAssemblerLine(kind, sourceA, sourceB, autoOutputResult = true) {
+        if (!sourceA || !sourceB) return false;
+
+        const midX = Math.round((sourceA.storageGx + sourceB.storageGx) / 2);
+        const midZ = Math.round((sourceA.storageGz + sourceB.storageGz) / 2);
+        const aSpot = findClearMachineSpot(midX, midZ, 0, 7);
+        if (!aSpot) return false;
+
+        // Place destination Storage vault forward of Assembler
+        const outCenterX = aSpot.gx + DIR_VECTORS[aSpot.dir].dx * 3;
+        const outCenterZ = aSpot.gz + DIR_VECTORS[aSpot.dir].dz * 3;
+        const vSpot = findClearMachineSpot(outCenterX, outCenterZ, aSpot.dir, 5);
+        if (!vSpot) return false;
+
+        // Two distinct input entry tiles on the Assembler: Rear port & Left port
+        const leftDir = (aSpot.dir + 1) % 4;
+        const leftEntryX = aSpot.gx + DIR_VECTORS[leftDir].dx;
+        const leftEntryZ = aSpot.gz + DIR_VECTORS[leftDir].dz;
+        const leftEntryFaceDir = (leftDir + 2) % 4; // faces into the Assembler!
+
+        if (!isTileAvailableForAI(leftEntryX, leftEntryZ, false)) return false;
+
+        const blocked = new Set([
+          tileKey(aSpot.gx, aSpot.gz),
+          tileKey(vSpot.gx, vSpot.gz)
+        ]);
+
+        const outAX = sourceA.storageGx + DIR_VECTORS[sourceA.storageDir].dx;
+        const outAZ = sourceA.storageGz + DIR_VECTORS[sourceA.storageDir].dz;
+        const beltA = findConveyorPath(outAX, outAZ, aSpot.rearX, aSpot.rearZ, aSpot.dir, blocked);
+        if (!beltA) return false;
+        beltA.forEach((b) => blocked.add(tileKey(b.gx, b.gz)));
+
+        const outBX = sourceB.storageGx + DIR_VECTORS[sourceB.storageDir].dx;
+        const outBZ = sourceB.storageGz + DIR_VECTORS[sourceB.storageDir].dz;
+        const beltB = findConveyorPath(outBX, outBZ, leftEntryX, leftEntryZ, leftEntryFaceDir, blocked);
+        if (!beltB) return false;
+        beltB.forEach((b) => blocked.add(tileKey(b.gx, b.gz)));
+
+        const beltOut = findConveyorPath(aSpot.frontX, aSpot.frontZ, vSpot.rearX, vSpot.rearZ, vSpot.dir, blocked);
+        if (!beltOut) return false;
+
+        // Ensure source storages have autoOutput enabled so items flow into this Assembler
+        const bA = getBuildingAt(sourceA.storageGx, sourceA.storageGz);
+        if (bA && bA.type === 'storage') bA.autoOutput = true;
+        const bB = getBuildingAt(sourceB.storageGx, sourceB.storageGz);
+        if (bB && bB.type === 'storage') bB.autoOutput = true;
+
+        sourceA.consumedByAssembler = true;
+        sourceB.consumedByAssembler = true;
+
+        const label = kind === 'robot_line' ? 'Robot Component Assembly Line' : 'Circuit Synthesis Line';
+        aiAgent.lineCounter += 1;
+        const lineId = aiAgent.lineCounter;
+
+        aiAgent.actionQueue.push({
+          type: 'assembler',
+          gx: aSpot.gx,
+          gz: aSpot.gz,
+          dir: aSpot.dir,
+          recipeMode: 'auto',
+          note: `${label} #${lineId}: Assembler`
+        });
+        aiAgent.actionQueue.push({
+          type: 'storage',
+          gx: vSpot.gx,
+          gz: vSpot.gz,
+          dir: vSpot.dir,
+          autoOutput: autoOutputResult,
+          note: `${label} #${lineId}: Vault`
+        });
+        beltA.forEach((b) => aiAgent.actionQueue.push({ ...b, note: `${label} #${lineId}: Input A Belt` }));
+        beltB.forEach((b) => aiAgent.actionQueue.push({ ...b, note: `${label} #${lineId}: Input B Belt` }));
+        beltOut.forEach((b) => aiAgent.actionQueue.push({ ...b, note: `${label} #${lineId}: Output Belt` }));
+
+        aiAgent.plannedLines.push({
+          kind,
+          assemblerGx: aSpot.gx,
+          assemblerGz: aSpot.gz,
+          storageGx: vSpot.gx,
+          storageGz: vSpot.gz,
+          storageDir: vSpot.dir
+        });
+
+        logAIDecision(`Planned ${label} #${lineId} with A* dual-port routing.`);
+        return true;
+      }
+
+      // Plan an Overclocker Spire adjacent to an Assembler or Furnace
+      function planOverclockerNearAssembler() {
+        for (const line of aiAgent.plannedLines) {
+          if (line.overclocked) continue;
+          if (line.kind !== 'robot_line' && line.kind !== 'circuit_line') continue;
+          const ax = line.assemblerGx;
+          const az = line.assemblerGz;
+          const offsets = [[1, 1], [-1, 1], [1, -1], [-1, -1], [1, 0], [-1, 0]];
+          for (const [dx, dz] of offsets) {
+            if (isTileAvailableForAI(ax + dx, az + dz, false)) {
+              line.overclocked = true;
+              aiAgent.actionQueue.push({
+                type: 'overclocker',
+                gx: ax + dx,
+                gz: az + dz,
+                dir: 0,
+                note: 'Overclocker Resonance Spire (+35% Speed)'
+              });
+              logAIDecision(`Deploying Overclocker Spire at [${ax + dx}, ${az + dz}] to boost Assembler.`);
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      // Master AI Strategic Brain: evaluates power headroom & campaign goals, populates actionQueue
+      function runAIStrategicPlanner() {
+        // 1. Power Monitor: maintain at least +35W headroom whenever affordable
+        const headroom = state.powerSupply - state.powerDemand;
+        const queuedGen = aiAgent.actionQueue.some((op) => op.type === 'generator');
+        if ((headroom < 35 || state.powerEfficiency < 0.95) && !queuedGen) {
+          const genOp = planGeneratorPlacement();
+          if (genOp) {
+            aiAgent.actionQueue.unshift(genOp); // High priority!
+            aiAgent.phaseLabel = 'POWER GRID';
+            logAIDecision(`Power headroom low (${Math.round(headroom)}W). Prioritizing Generator (+120W).`);
+            return;
+          }
+        }
+
+        if (aiAgent.actionQueue.length > 0) return;
+
+        // Clean stale plannedLines references if buildings were removed
+        aiAgent.plannedLines = aiAgent.plannedLines.filter((l) => {
+          const st = getBuildingAt(l.storageGx, l.storageGz);
+          return st && st.type === 'storage';
+        });
+
+        const metalLines = aiAgent.plannedLines.filter((l) => l.kind === 'metal_line');
+        const freeMetalLines = metalLines.filter((l) => !l.consumedByAssembler);
+        const cellLines = aiAgent.plannedLines.filter((l) => l.kind === 'cell_line');
+        const freeCellLines = cellLines.filter((l) => !l.consumedByAssembler);
+        const circuitLines = aiAgent.plannedLines.filter((l) => l.kind === 'circuit_line');
+        const freeCircuitLines = circuitLines.filter((l) => !l.consumedByAssembler);
+        const robotLines = aiAgent.plannedLines.filter((l) => l.kind === 'robot_line');
+
+        // Stage 1: Build initial Ore -> Metal Smelting Line
+        if (metalLines.length === 0) {
+          aiAgent.phaseLabel = 'STAGE 1: SMELTING';
+          planSmeltingLine('ore', true);
+          return;
+        }
+
+        // Wait until Stage 1 completes and unlocks Assembler & Splitter
+        if (state.stageIndex < 1 && !state.sandboxMode) {
+          aiAgent.phaseLabel = 'STAGE 1: SMELTING';
+          aiAgent.currentActionText = `Smelting Metal (${state.stats.storedTotal.metal}/4) to unlock Assembler...`;
+          return;
+        }
+
+        // Stage 2+: Ensure we have Crystal -> Energy Cell line & Metal -> Metal line to feed a Circuit Assembler
+        if (circuitLines.length === 0) {
+          aiAgent.phaseLabel = 'STAGE 2: CIRCUITS';
+          if (freeCellLines.length === 0) {
+            planSmeltingLine('crystal', true);
+            return;
+          }
+          if (freeMetalLines.length === 0) {
+            planSmeltingLine('ore', true);
+            return;
+          }
+          planAssemblerLine('circuit_line', freeMetalLines[0], freeCellLines[0], true);
+          return;
+        }
+
+        // Wait until Stage 2 completes (4 Circuits stored) before starting Robot Component line
+        if (state.stageIndex < 2 && !state.sandboxMode) {
+          aiAgent.phaseLabel = 'STAGE 2: CIRCUITS';
+          aiAgent.currentActionText = `Synthesizing Circuits (${state.stats.storedTotal.circuit}/4)...`;
+          return;
+        }
+
+        // Stage 3-5: Build Robot Component Assembly Line (Circuit + Metal -> Robot Component)
+        if (robotLines.length === 0) {
+          aiAgent.phaseLabel = 'STAGE 3+: ROBOTICS';
+          if (freeCircuitLines.length === 0) {
+            // Need another circuit line first
+            if (freeCellLines.length === 0) { planSmeltingLine('crystal', true); return; }
+            if (freeMetalLines.length === 0) { planSmeltingLine('ore', true); return; }
+            planAssemblerLine('circuit_line', freeMetalLines[0], freeCellLines[0], true);
+            return;
+          }
+          if (freeMetalLines.length === 0) {
+            planSmeltingLine('ore', true);
+            return;
+          }
+          planAssemblerLine('robot_line', freeCircuitLines[0], freeMetalLines[0], false);
+          return;
+        }
+
+        // Deploy Overclockers once unlocked at Stage 3+ and credits allow
+        if ((state.stageIndex >= 2 || state.sandboxMode) && state.credits >= 220) {
+          if (planOverclockerNearAssembler()) {
+            aiAgent.phaseLabel = 'OPTIMIZATION';
+            return;
+          }
+        }
+
+        // Scale up Parallel Production Lines (#2) as credits accumulate
+        if (robotLines.length < 2 && state.credits >= 260) {
+          aiAgent.phaseLabel = 'SCALING LINE #2';
+          if (freeCircuitLines.length === 0) {
+            if (freeCellLines.length === 0) { planSmeltingLine('crystal', true); return; }
+            if (freeMetalLines.length === 0) { planSmeltingLine('ore', true); return; }
+            planAssemblerLine('circuit_line', freeMetalLines[0], freeCellLines[0], true);
+            return;
+          }
+          if (freeMetalLines.length === 0) {
+            planSmeltingLine('ore', true);
+            return;
+          }
+          planAssemblerLine('robot_line', freeCircuitLines[0], freeMetalLines[0], false);
+          return;
+        }
+
+        aiAgent.phaseLabel = state.campaignComplete ? 'MASTERWORK' : `STAGE ${state.stageIndex + 1} ACTIVE`;
+        aiAgent.currentActionText = `Monitoring ${robotLines.length} Robotics Line(s) • ${state.stats.storedTotal.robot_component} Robots Vaulted`;
+      }
+
+      function stepAIAgent(dt, elapsed) {
+        if (!aiDroneGroup) return;
+
+        // Animate drone rotors
+        for (let i = 0; i < aiDroneRotors.length; i++) {
+          aiDroneRotors[i].rotation.y += (i % 2 === 0 ? 1 : -1) * 24 * dt;
+        }
+
+        if (!aiAgent.enabled) {
+          aiDroneGroup.visible = false;
+          aiLaserLine.visible = false;
+          aiTargetRing.visible = false;
+          return;
+        }
+
+        aiDroneGroup.visible = true;
+        const speedMult = state.simSpeed;
+
+        // Run strategic planner periodically
+        aiAgent.decisionTimer += dt * speedMult;
+        if (aiAgent.decisionTimer >= 0.45) {
+          aiAgent.decisionTimer = 0;
+          runAIStrategicPlanner();
+        }
+
+        if (aiAgent.buildCooldown > 0) {
+          aiAgent.buildCooldown = Math.max(0, aiAgent.buildCooldown - dt * speedMult);
+        }
+
+        // Execute next queued build step when drone reaches target & credits are available
+        const nextOp = aiAgent.actionQueue[0];
+        if (nextOp) {
+          const wTarget = gridToWorld(nextOp.gx, nextOp.gz);
+          aiAgent.droneTargetPos.set(wTarget.x, 5.2 + Math.sin(elapsed * 3.5) * 0.25, wTarget.z);
+          aiAgent.currentActionText = nextOp.note || `Building ${BUILDINGS[nextOp.type].name} at [${nextOp.gx}, ${nextOp.gz}]`;
+
+          aiTargetRing.visible = true;
+          aiTargetRing.position.set(wTarget.x, 0.05, wTarget.z);
+          aiTargetRing.rotation.y = elapsed * 2.5;
+
+          const distXZ = Math.hypot(aiAgent.dronePos.x - wTarget.x, aiAgent.dronePos.z - wTarget.z);
+          const def = BUILDINGS[nextOp.type];
+
+          if (distXZ < 1.2 && aiAgent.buildCooldown <= 0) {
+            if (!isTileEmpty(nextOp.gx, nextOp.gz)) {
+              // Tile became occupied (e.g., by player) -> skip gracefully and replan
+              aiAgent.actionQueue.shift();
+              logAIDecision(`Tile [${nextOp.gx}, ${nextOp.gz}] occupied; adapting route.`);
+            } else if (state.credits >= def.cost) {
+              const placed = placeBuilding(nextOp.gx, nextOp.gz, nextOp.type, nextOp.dir, {
+                isAI: true,
+                recipeMode: nextOp.recipeMode || 'auto',
+                autoOutput: Boolean(nextOp.autoOutput)
+              });
+              if (placed) {
+                aiAgent.actionQueue.shift();
+                aiAgent.buildCooldown = 0.28;
+                aiAgent.laserTargetPos = new THREE.Vector3(wTarget.x, 0.4, wTarget.z);
+                aiAgent.laserTimer = 0.35;
+              }
+            } else {
+              aiAgent.currentActionText = `Awaiting $${def.cost} for ${def.name} (Have $${Math.floor(state.credits)})`;
+            }
+          }
+        } else {
+          // Patrol figure-eight orbit above center of factory while monitoring
+          aiAgent.droneTargetPos.set(
+            Math.sin(elapsed * 0.55) * 9,
+            5.8 + Math.cos(elapsed * 1.4) * 0.3,
+            Math.cos(elapsed * 0.55) * 9
+          );
+          aiTargetRing.visible = false;
+        }
+
+        // Smooth drone flight physics
+        const flyDamp = 1 - Math.exp(-7.5 * dt * speedMult);
+        aiAgent.dronePos.lerp(aiAgent.droneTargetPos, flyDamp);
+        aiDroneGroup.position.copy(aiAgent.dronePos);
+        aiDroneGroup.rotation.y += 1.2 * dt;
+
+        // Camera Follow AI mode
+        if (aiAgent.followCamera && !isOrbitDragging) {
+          state.camera.targetX = aiAgent.dronePos.x;
+          state.camera.targetZ = aiAgent.dronePos.z;
+        }
+
+        // Update Construction Laser Beam
+        if (aiAgent.laserTimer > 0 && aiAgent.laserTargetPos) {
+          aiAgent.laserTimer -= dt;
+          aiLaserLine.visible = true;
+          const posAttr = aiLaserLine.geometry.attributes.position;
+          posAttr.setXYZ(0, aiAgent.dronePos.x, aiAgent.dronePos.y - 0.2, aiAgent.dronePos.z);
+          posAttr.setXYZ(1, aiAgent.laserTargetPos.x, aiAgent.laserTargetPos.y, aiAgent.laserTargetPos.z);
+          posAttr.needsUpdate = true;
+        } else if (nextOp) {
+          // Scanning beam toward upcoming build tile
+          aiLaserLine.visible = true;
+          const wTarget = gridToWorld(nextOp.gx, nextOp.gz);
+          const posAttr = aiLaserLine.geometry.attributes.position;
+          posAttr.setXYZ(0, aiAgent.dronePos.x, aiAgent.dronePos.y - 0.2, aiAgent.dronePos.z);
+          posAttr.setXYZ(1, wTarget.x, 0.15, wTarget.z);
+          posAttr.needsUpdate = true;
+        } else {
+          aiLaserLine.visible = false;
+        }
+
+        updateAIBrainHUD();
+      }
+
+      function updateAIBrainHUD() {
+        const phaseEl = document.getElementById('ai-phase-tag');
+        const actionEl = document.getElementById('ai-current-action');
+        const powerEl = document.getElementById('ai-diag-power');
+        const linesEl = document.getElementById('ai-diag-lines');
+        const queueEl = document.getElementById('ai-diag-queue');
+
+        if (!phaseEl) return;
+        phaseEl.textContent = aiAgent.phaseLabel;
+        actionEl.textContent = aiAgent.currentActionText;
+
+        const headroom = Math.round(state.powerSupply - state.powerDemand);
+        powerEl.textContent = `${headroom >= 0 ? '+' : ''}${headroom}W`;
+        powerEl.className = `font-mono-num text-[11px] font-bold ${headroom >= 35 ? 'text-emerald-400' : 'text-amber-400'}`;
+        linesEl.textContent = `${aiAgent.plannedLines.length}`;
+        queueEl.textContent = `${aiAgent.actionQueue.length} ops`;
+      }
+
+      // =========================================================================
+      // 11. 3D VISUAL ANIMATIONS & PARTICLE EMISSION
+      // =========================================================================
+      function animateScene(dt, elapsed) {
+        const effDt = state.paused ? 0 : dt * state.simSpeed;
+        const pEff = state.powerEfficiency;
+
+        if (beltTexture && !state.paused) {
+          beltTexture.offset.y -= BELT_SPEED * pEff * effDt * 0.5;
+        }
+
+        // Dynamic Power Conduit Glow (Cyan Healthy -> Amber Strained -> Crimson Overload)
+        const conduitHex = pEff >= 0.98 ? 0x22d3ee : (pEff >= 0.5 ? 0xf59e0b : 0xef4444);
+        if (floorConduitMat) {
+          floorConduitMat.color.setHex(conduitHex);
+          floorConduitMat.opacity = pEff >= 0.98
+            ? 0.35 + Math.sin(elapsed * 3) * 0.08
+            : 0.50 + Math.sin(elapsed * 8) * 0.22;
+        }
+        if (edgeConduitMat) {
+          edgeConduitMat.color.setHex(conduitHex);
+        }
+
+        if (selectionRingMesh && selectionRingMesh.visible) {
+          const s = 1.0 + Math.sin(elapsed * 5) * 0.04;
+          selectionRingMesh.scale.set(s, s, 1);
+        }
+
+        state.buildings.forEach((b) => {
+          if (!b.mesh || !b.mesh.userData.animParts) return;
+          const parts = b.mesh.userData.animParts;
+          const isRunning = !state.paused && (b.status === 'ACTIVE' || b.status === 'LOW POWER');
+          const speedMult = isRunning ? Math.max(0.25, pEff) * (b.overclockMult || 1.0) * state.simSpeed : 0;
+          const wPos = gridToWorld(b.gx, b.gz);
+
+          if (b.type === 'miner') {
+            if (parts.drill) {
+              parts.drill.rotation.y += 5.5 * dt * speedMult;
+              parts.drill.position.y = isRunning ? Math.sin(elapsed * 8) * 0.12 : 0;
+            }
+            if (parts.gearA) parts.gearA.rotation.y += 2.2 * dt * speedMult;
+            if (parts.gearB) parts.gearB.rotation.y -= 3.1 * dt * speedMult;
+            if (parts.statusLedMat) {
+              const ledColor = b.status === 'ACTIVE' ? 0x10b981 : (b.status === 'BLOCKED' ? 0xf59e0b : 0xef4444);
+              parts.statusLedMat.color.setHex(ledColor);
+              parts.statusLedMat.emissive.setHex(ledColor);
+            }
+            if (isRunning && Math.random() < 0.20) {
+              spawnParticle(
+                wPos.x + (Math.random() - 0.5) * 0.5,
+                0.35,
+                wPos.z + (Math.random() - 0.5) * 0.5,
+                (Math.random() - 0.5) * 1.4,
+                1.2 + Math.random() * 1.0,
+                (Math.random() - 0.5) * 1.4,
+                b.veinType === 'crystal' ? 0x38bdf8 : 0xfbbf24,
+                0.55,
+                0.85,
+                0.15
+              );
+            }
+          }
+
+          else if (b.type === 'furnace') {
+            if (parts.sideGear) parts.sideGear.rotation.x += 2.4 * dt * speedMult;
+            if (parts.coreMat) {
+              parts.coreMat.emissiveIntensity = isRunning
+                ? 1.2 + Math.sin(elapsed * 11 + b.id) * 0.35
+                : 0.25;
+            }
+            if (isRunning && Math.random() < 0.26) {
+              const stackWorld = new THREE.Vector3(-0.42, 2.7, -0.35).applyAxisAngle(new THREE.Vector3(0, 1, 0), b.dir * Math.PI / 2);
+              spawnParticle(
+                wPos.x + stackWorld.x + (Math.random() - 0.5) * 0.14,
+                stackWorld.y,
+                wPos.z + stackWorld.z + (Math.random() - 0.5) * 0.14,
+                (Math.random() - 0.5) * 0.35,
+                1.1 + Math.random() * 0.5,
+                (Math.random() - 0.5) * 0.35,
+                0x475569,
+                1.4,
+                0.9,
+                2.2
+              );
+            }
+          }
+
+          else if (b.type === 'assembler') {
+            const activeRec = ASSEMBLER_RECIPES[b.activeRecipeId] || ASSEMBLER_RECIPES.circuit;
+            if (parts.holoMat) {
+              parts.holoMat.color.setHex(activeRec.color);
+              parts.holoMat.emissive.setHex(activeRec.color);
+            }
+            if (parts.holoCore) {
+              parts.holoCore.rotation.y += 1.8 * dt;
+              parts.holoCore.position.y = 1.14 + Math.sin(elapsed * 3.5 + b.id) * 0.06;
+            }
+            if (parts.tableGear) parts.tableGear.rotation.y += 1.6 * dt * speedMult;
+            if (parts.leftArm && parts.rightArm) {
+              const swing = isRunning ? Math.sin(elapsed * 7.0 + b.id) * 0.30 : 0;
+              parts.leftArm.rotation.z = swing;
+              parts.rightArm.rotation.z = -swing;
+            }
+            if (isRunning && Math.random() < 0.18) {
+              spawnParticle(
+                wPos.x + (Math.random() - 0.5) * 0.35,
+                0.65,
+                wPos.z + (Math.random() - 0.5) * 0.35,
+                (Math.random() - 0.5) * 1.8,
+                1.1 + Math.random() * 1.0,
+                (Math.random() - 0.5) * 1.8,
+                activeRec.color,
+                0.42,
+                0.65,
+                0.1
+              );
+            }
+          }
+
+          else if (b.type === 'splitter') {
+            if (parts.rotor) parts.rotor.rotation.y += 2.4 * dt * (state.paused ? 0 : Math.max(0.3, pEff));
+          }
+
+          else if (b.type === 'generator') {
+            const genMult = state.paused ? 0 : state.simSpeed;
+            if (parts.flyL) parts.flyL.rotation.x += 3.2 * dt * genMult;
+            if (parts.flyR) parts.flyR.rotation.x -= 3.2 * dt * genMult;
+            if (parts.ring1) parts.ring1.position.y = 0.65 + ((elapsed * 0.8) % 0.9);
+            if (parts.ring2) parts.ring2.position.y = 0.65 + (((elapsed * 0.8) + 0.45) % 0.9);
+          }
+
+          else if (b.type === 'storage') {
+            if (parts.ledBars) {
+              const total = getTotalBufferCount(b.storedItems);
+              const litCount = Math.ceil((total / 150) * 10);
+              for (let i = 0; i < 10; i++) {
+                const mat = parts.ledBars[i];
+                if (i < litCount) {
+                  const col = i >= 8 ? 0xf59e0b : 0x10b981;
+                  mat.color.setHex(col);
+                  mat.emissive.setHex(col);
+                } else {
+                  mat.color.setHex(0x1e293b);
+                  mat.emissive.setHex(0x000000);
+                }
+              }
+            }
+          }
+
+          else if (b.type === 'overclocker') {
+            if (parts.orb) {
+              parts.orb.rotation.y += 2.2 * dt;
+              parts.orb.position.y = 2.65 + Math.sin(elapsed * 4) * 0.08;
+            }
+            if (parts.halo) {
+              parts.halo.rotation.z = Math.sin(elapsed * 2.5) * 0.35;
+              parts.halo.rotation.y += 1.8 * dt;
+            }
+          }
+        });
+
+        updateParticles(dt);
+      }
+
+      // =========================================================================
+      // 12. CAMERA, RAYCASTING & INPUT CONTROLS
+      // =========================================================================
+      const keysDown = new Set();
+      let isOrbitDragging = false;
+      let isBeltPainting = false;
+      let lastPaintedTile = null;
+      let pointerDownPos = { x: 0, y: 0 };
+      let lastPointerPos = { x: 0, y: 0 };
+      let pointerMoved = false;
+
+      function updateCameraTransform(dt) {
+        const panSpeed = 24 * dt * (state.camera.curDistance / 32);
+        const forwardX = -Math.sin(state.camera.yaw);
+        const forwardZ = -Math.cos(state.camera.yaw);
+        const rightX = Math.cos(state.camera.yaw);
+        const rightZ = -Math.sin(state.camera.yaw);
+
+        if (keysDown.has('KeyW') || keysDown.has('ArrowUp')) {
+          state.camera.targetX += forwardX * panSpeed;
+          state.camera.targetZ += forwardZ * panSpeed;
+        }
+        if (keysDown.has('KeyS') || keysDown.has('ArrowDown')) {
+          state.camera.targetX -= forwardX * panSpeed;
+          state.camera.targetZ -= forwardZ * panSpeed;
+        }
+        if (keysDown.has('KeyA') || keysDown.has('ArrowLeft')) {
+          state.camera.targetX -= rightX * panSpeed;
+          state.camera.targetZ -= rightZ * panSpeed;
+        }
+        if (keysDown.has('KeyD') || keysDown.has('ArrowRight')) {
+          state.camera.targetX += rightX * panSpeed;
+          state.camera.targetZ += rightZ * panSpeed;
+        }
+
+        const limit = HALF_WORLD + 2;
+        state.camera.targetX = Math.max(-limit, Math.min(limit, state.camera.targetX));
+        state.camera.targetZ = Math.max(-limit, Math.min(limit, state.camera.targetZ));
+
+        const damp = 1 - Math.exp(-12 * dt);
+        state.camera.curTargetX += (state.camera.targetX - state.camera.curTargetX) * damp;
+        state.camera.curTargetZ += (state.camera.targetZ - state.camera.curTargetZ) * damp;
+        state.camera.curYaw += (state.camera.yaw - state.camera.curYaw) * damp;
+        state.camera.curPitch += (state.camera.pitch - state.camera.curPitch) * damp;
+        state.camera.curDistance += (state.camera.distance - state.camera.curDistance) * damp;
+
+        const r = state.camera.curDistance;
+        const sinP = Math.sin(state.camera.curPitch);
+        const cosP = Math.cos(state.camera.curPitch);
+        const cx = state.camera.curTargetX + r * sinP * Math.sin(state.camera.curYaw);
+        const cy = r * cosP;
+        const cz = state.camera.curTargetZ + r * sinP * Math.cos(state.camera.curYaw);
+
+        camera.position.set(cx, cy, cz);
+        camera.lookAt(state.camera.curTargetX, 0.3, state.camera.curTargetZ);
+      }
+
+      function raycastGridTile(clientX, clientY) {
+        const rect = renderer.domElement.getBoundingClientRect();
+        const ndc = new THREE.Vector2(
+          ((clientX - rect.left) / rect.width) * 2 - 1,
+          -((clientY - rect.top) / rect.height) * 2 + 1
+        );
+        raycaster.setFromCamera(ndc, camera);
+        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+        const hitPoint = new THREE.Vector3();
+        if (raycaster.ray.intersectPlane(plane, hitPoint)) {
+          const { gx, gz } = worldToGrid(hitPoint.x, hitPoint.z);
+          if (inBounds(gx, gz)) {
+            return { gx, gz };
+          }
+        }
+        return null;
+      }
+
+      function updateGhostPreview() {
+        const hover = state.hoveredTile;
+        const tooltip = document.getElementById('hover-tooltip');
+
+        if (!hover) {
+          hoverCursorMesh.visible = false;
+          ghostGroup.visible = false;
+          tooltip.classList.add('hidden');
+          return;
+        }
+
+        const wPos = gridToWorld(hover.gx, hover.gz);
+        hoverCursorMesh.visible = true;
+        hoverCursorMesh.position.set(wPos.x, 0.02, wPos.z);
+
+        if (state.activeTool) {
+          const def = BUILDINGS[state.activeTool];
+          const valid = isTileEmpty(hover.gx, hover.gz) && state.credits >= def.cost;
+
+          if (currentGhostType !== state.activeTool) {
+            while (ghostGroup.children.length > 0) {
+              ghostGroup.remove(ghostGroup.children[0]);
+            }
+            const mesh = createBuildingMesh(state.activeTool, true);
+            ghostGroup.add(mesh);
+
+            const padGeo = new THREE.PlaneGeometry(TILE_SIZE * 0.94, TILE_SIZE * 0.94);
+            padGeo.rotateX(-Math.PI / 2);
+            const padMat = new THREE.MeshBasicMaterial({
+              color: 0x10b981,
+              transparent: true,
+              opacity: 0.32,
+              side: THREE.DoubleSide
+            });
+            const pad = new THREE.Mesh(padGeo, padMat);
+            pad.position.y = 0.015;
+            pad.name = 'ghost_pad';
+            ghostGroup.add(pad);
+
+            currentGhostType = state.activeTool;
+            currentGhostValid = null;
+          }
+
+          if (currentGhostValid !== valid) {
+            const pad = ghostGroup.getObjectByName('ghost_pad');
+            if (pad) pad.material.color.setHex(valid ? 0x10b981 : 0xef4444);
+            currentGhostValid = valid;
+          }
+
+          ghostGroup.visible = true;
+          ghostGroup.position.set(wPos.x, 0, wPos.z);
+          ghostGroup.rotation.y = state.placementDir * (Math.PI / 2);
+        } else {
+          ghostGroup.visible = false;
+        }
+      }
+
+      function updateHoverTooltip(clientX, clientY) {
+        const tooltip = document.getElementById('hover-tooltip');
+        const hover = state.hoveredTile;
+        if (!hover) {
+          tooltip.classList.add('hidden');
+          return;
+        }
+
+        const existing = getBuildingAt(hover.gx, hover.gz);
+        const veinType = state.veins.get(tileKey(hover.gx, hover.gz));
+
+        if (!existing && !veinType && !state.activeTool) {
+          tooltip.classList.add('hidden');
+          return;
+        }
+
+        tooltip.classList.remove('hidden');
+        tooltip.style.left = `${Math.min(window.innerWidth - 200, clientX + 14)}px`;
+        tooltip.style.top = `${Math.min(window.innerHeight - 75, clientY + 14)}px`;
+
+        const titleEl = document.getElementById('hover-title');
+        const subEl = document.getElementById('hover-sub');
+
+        if (existing) {
+          const def = BUILDINGS[existing.type];
+          titleEl.textContent = `${def.name} [${hover.gx}, ${hover.gz}]`;
+          subEl.textContent = `Status: ${existing.status}`;
+        } else if (state.activeTool) {
+          const def = BUILDINGS[state.activeTool];
+          titleEl.textContent = `Place ${def.name} ($${def.cost})`;
+          subEl.textContent = veinType === 'crystal'
+            ? 'Cyan Crystal Vein (1.5s Crystal yield)'
+            : veinType === 'ore'
+              ? 'Amber Ore Vein (1.5s Ore yield)'
+              : `Tile [${hover.gx}, ${hover.gz}] • [R] Rotate`;
+        } else if (veinType === 'crystal') {
+          titleEl.textContent = 'Cyan Energy Crystal Vein';
+          subEl.textContent = `Tile [${hover.gx}, ${hover.gz}] • Place Miner for Crystals`;
+        } else if (veinType === 'ore') {
+          titleEl.textContent = 'Amber Ore Vein';
+          subEl.textContent = `Tile [${hover.gx}, ${hover.gz}] • Place Miner for Ore`;
+        }
+      }
+
+      function setupInputListeners() {
+        const dom = renderer.domElement;
+
+        dom.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        dom.addEventListener('pointerdown', (e) => {
+          sound.ensureContext();
+          pointerDownPos = { x: e.clientX, y: e.clientY };
+          lastPointerPos = { x: e.clientX, y: e.clientY };
+          pointerMoved = false;
+
+          if (e.button === 2 || e.button === 1) {
+            isOrbitDragging = true;
+            return;
+          }
+
+          if (e.button === 0) {
+            const tile = raycastGridTile(e.clientX, e.clientY);
+            state.hoveredTile = tile;
+
+            if (state.activeTool === 'conveyor' && tile) {
+              isBeltPainting = true;
+              lastPaintedTile = tile;
+              placeBuilding(tile.gx, tile.gz, 'conveyor', state.placementDir);
+            } else if (!state.activeTool && (!tile || !getBuildingAt(tile.gx, tile.gz))) {
+              isOrbitDragging = true;
+            }
+          }
+        });
+
+        window.addEventListener('pointermove', (e) => {
+          const dx = e.clientX - lastPointerPos.x;
+          const dy = e.clientY - lastPointerPos.y;
+          if (Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y) > 5) {
+            pointerMoved = true;
+          }
+
+          if (isOrbitDragging) {
+            state.camera.yaw -= dx * 0.0065;
+            state.camera.pitch = Math.max(0.32, Math.min(1.22, state.camera.pitch - dy * 0.0055));
+          }
+
+          lastPointerPos = { x: e.clientX, y: e.clientY };
+
+          const tile = raycastGridTile(e.clientX, e.clientY);
+          state.hoveredTile = tile;
+          updateGhostPreview();
+          updateHoverTooltip(e.clientX, e.clientY);
+
+          if (isBeltPainting && state.activeTool === 'conveyor' && tile) {
+            if (!lastPaintedTile || tile.gx !== lastPaintedTile.gx || tile.gz !== lastPaintedTile.gz) {
+              if (lastPaintedTile) {
+                const stepX = tile.gx - lastPaintedTile.gx;
+                const stepZ = tile.gz - lastPaintedTile.gz;
+                let dragDir = state.placementDir;
+                if (Math.abs(stepX) + Math.abs(stepZ) === 1) {
+                  if (stepZ === 1) dragDir = 0;
+                  else if (stepX === 1) dragDir = 1;
+                  else if (stepZ === -1) dragDir = 2;
+                  else if (stepX === -1) dragDir = 3;
+
+                  state.placementDir = dragDir;
+                  const prevB = getBuildingAt(lastPaintedTile.gx, lastPaintedTile.gz);
+                  if (prevB && prevB.type === 'conveyor' && prevB.dir !== dragDir) {
+                    prevB.dir = dragDir;
+                    if (prevB.mesh) prevB.mesh.rotation.y = dragDir * (Math.PI / 2);
+                  }
+                }
+              }
+              if (isTileEmpty(tile.gx, tile.gz)) {
+                placeBuilding(tile.gx, tile.gz, 'conveyor', state.placementDir);
+              }
+              lastPaintedTile = tile;
+            }
+          }
+        });
+
+        window.addEventListener('pointerup', (e) => {
+          const wasBeltPainting = isBeltPainting;
+          isOrbitDragging = false;
+          isBeltPainting = false;
+          lastPaintedTile = null;
+
+          if (!pointerMoved && e.target === dom) {
+            if (e.button === 2) {
+              if (state.activeTool !== null) {
+                setActiveTool(null);
+                sound.playClick();
+              } else if (state.selectedBuildingId !== null) {
+                selectBuilding(null);
+                sound.playClick();
+              }
+              return;
+            }
+
+            if (e.button === 0 && !wasBeltPainting) {
+              const tile = raycastGridTile(e.clientX, e.clientY);
+              if (!tile) return;
+
+              if (state.activeTool) {
+                placeBuilding(tile.gx, tile.gz, state.activeTool, state.placementDir);
+                updateGhostPreview();
+              } else {
+                const existing = getBuildingAt(tile.gx, tile.gz);
+                selectBuilding(existing);
+                if (existing) sound.playClick();
+              }
+            }
+          }
+        });
+
+        dom.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          const zoomFactor = e.deltaY > 0 ? 1.09 : 0.91;
+          state.camera.distance = Math.max(12, Math.min(68, state.camera.distance * zoomFactor));
+        }, { passive: false });
+
+        window.addEventListener('keydown', (e) => {
+          if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+          keysDown.add(e.code);
+
+          if (e.code === 'Space') {
+            e.preventDefault();
+            togglePause();
+          } else if (e.code === 'KeyP') {
+            e.preventDefault();
+            toggleAIAutoPlay();
+          } else if (e.code === 'KeyR') {
+            if (state.activeTool !== null) {
+              state.placementDir = (state.placementDir + 1) % 4;
+              sound.playRotate();
+              updateGhostPreview();
+            } else if (state.selectedBuildingId !== null) {
+              rotateBuilding(state.buildings.get(state.selectedBuildingId));
+            }
+          } else if (e.code === 'Delete' || e.code === 'Backspace') {
+            if (state.selectedBuildingId !== null) {
+              removeBuilding(state.buildings.get(state.selectedBuildingId));
+            }
+          } else if (e.code === 'Escape') {
+            if (state.activeTool !== null) setActiveTool(null);
+            else if (state.selectedBuildingId !== null) selectBuilding(null);
+          } else if (e.code.startsWith('Digit')) {
+            const num = parseInt(e.code.replace('Digit', ''), 10);
+            if (num >= 1 && num <= BUILDING_LIST.length) {
+              const type = BUILDING_LIST[num - 1];
+              setActiveTool(state.activeTool === type ? null : type);
+            }
+          }
+        });
+
+        window.addEventListener('keyup', (e) => {
+          keysDown.delete(e.code);
+        });
+
+        window.addEventListener('resize', () => {
+          const container = document.getElementById('canvas-container');
+          camera.aspect = container.clientWidth / container.clientHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+      }
+
+      // =========================================================================
+      // 13. HUD, HOTBAR, INSPECTOR & CAMPAIGN UI
+      // =========================================================================
+      function getBuildingSVG(type) {
+        const svgs = {
+          miner: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4l6 6-8 8-6-6 8-8z"/><path d="M4 20l5-5"/><path d="M12 2v4M20 12h2"/></svg>`,
+          conveyor: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="8" rx="4"/><path d="M8 12h8M13 9l3 3-3 3"/></svg>`,
+          splitter: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20v-8"/><path d="M12 12L5 5M12 12l7-7"/><path d="M5 9V5h4M15 5h4v4"/></svg>`,
+          furnace: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 21h14V9l-7-6-7 6v12z"/><path d="M9 21v-6a3 3 0 0 1 6 0v6"/></svg>`,
+          assembler: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M3 7l5 3M21 7l-5 3M4 19h16"/></svg>`,
+          generator: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
+          storage: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>`,
+          overclocker: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 19 21 12 17 5 21 12 2"/></svg>`
+        };
+        return svgs[type] || '';
+      }
+
+      function buildHotbarUI() {
+        const hotbar = document.getElementById('hotbar');
+        hotbar.innerHTML = '';
+
+        const inspectBtn = document.createElement('button');
+        inspectBtn.id = 'tool-inspect';
+        inspectBtn.className = `build-card shrink-0 px-2.5 py-1.5 rounded-xl border border-slate-700/80 bg-slate-900/90 flex flex-col items-center justify-center min-w-[64px] ${state.activeTool === null ? 'active' : ''}`;
+        inspectBtn.innerHTML = `
+          <div class="text-slate-300 mb-0.5">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>
+          </div>
+          <div class="text-[11px] font-display font-bold text-slate-100 leading-tight">Inspect</div>
+          <div class="text-[9px] font-mono-num text-slate-400">ESC</div>
+        `;
+        inspectBtn.onclick = () => {
+          setActiveTool(null);
+          sound.playClick();
+        };
+        hotbar.appendChild(inspectBtn);
+
+        BUILDING_LIST.forEach((type) => {
+          const def = BUILDINGS[type];
+          const locked = state.stageIndex < def.unlockStage && !state.sandboxMode;
+          const active = state.activeTool === type;
+          const powerLabel = def.powerGen > 0 ? `+${def.powerGen}W` : `-${def.powerDraw}W`;
+          const powerColor = def.powerGen > 0 ? 'text-emerald-400' : 'text-cyan-300';
+
+          const btn = document.createElement('button');
+          btn.id = `tool-${type}`;
+          btn.className = `build-card shrink-0 px-2.5 py-1.5 rounded-xl border border-slate-700/80 bg-slate-900/90 flex flex-col items-center justify-between min-w-[78px] sm:min-w-[84px] ${active ? 'active' : ''} ${locked ? 'locked' : ''}`;
+          btn.innerHTML = `
+            <div class="w-full flex items-center justify-between text-[9px] font-mono-num text-slate-400">
+              <span class="px-1 rounded bg-slate-800 text-amber-300 font-bold">${def.key}</span>
+              <span class="${powerColor}">${powerLabel}</span>
+            </div>
+            <div class="text-amber-300 my-0.5">${getBuildingSVG(type)}</div>
+            <div class="text-[11px] font-display font-bold text-slate-100 leading-tight">${def.name}</div>
+            <div class="text-[10px] font-mono-num font-semibold text-amber-400">${locked ? `Stage ${def.unlockStage + 1}` : `$${def.cost}`}</div>
+          `;
+          btn.onclick = () => {
+            setActiveTool(state.activeTool === type ? null : type);
+            sound.playClick();
+          };
+          hotbar.appendChild(btn);
+        });
+      }
+
+      function updateHotbarUI() {
+        buildHotbarUI();
+      }
+
+      function computeGlobalInventories() {
+        const totals = { ore: 0, crystal: 0, metal: 0, energy_cell: 0, circuit: 0, robot_component: 0 };
+        state.buildings.forEach((b) => {
+          if (b.type === 'storage') {
+            for (const k of ITEM_ORDER) {
+              totals[k] += b.storedItems[k] || 0;
+            }
+          } else {
+            for (const k of ITEM_ORDER) {
+              totals[k] += b.outputBuffer[k] || 0;
+            }
+          }
+        });
+        return totals;
+      }
+
+      function updateHUD() {
+        const sup = Math.round(state.powerSupply);
+        const dem = Math.round(state.powerDemand);
+        const effPct = Math.round(state.powerEfficiency * 100);
+
+        document.getElementById('hud-power-text').textContent = `${sup} / ${dem} W`;
+        const effEl = document.getElementById('hud-power-eff');
+        const barEl = document.getElementById('hud-power-bar');
+        const warnBanner = document.getElementById('power-warning-banner');
+        effEl.textContent = `${effPct}%`;
+
+        if (effPct >= 98) {
+          effEl.className = 'font-mono-num font-bold text-emerald-400';
+          barEl.className = 'h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-300';
+          warnBanner.classList.add('hidden');
+        } else if (effPct >= 50) {
+          effEl.className = 'font-mono-num font-bold text-amber-400';
+          barEl.className = 'h-full rounded-full bg-amber-400 transition-all duration-300';
+          warnBanner.classList.remove('hidden');
+          document.getElementById('power-warning-pct').textContent = `${effPct}%`;
+        } else {
+          effEl.className = 'font-mono-num font-bold text-red-400';
+          barEl.className = 'h-full rounded-full bg-red-500 transition-all duration-300';
+          warnBanner.classList.remove('hidden');
+          document.getElementById('power-warning-pct').textContent = `${effPct}%`;
+        }
+        barEl.style.width = `${effPct}%`;
+
+        document.getElementById('hud-credits').textContent = `$${Math.floor(state.credits).toLocaleString()}`;
+
+        const inv = computeGlobalInventories();
+        const desktopContainer = document.getElementById('hud-resources');
+        const mobileContainer = document.getElementById('hud-resources-mobile');
+
+        let desktopHTML = '';
+        let mobileHTML = '';
+
+        ITEM_ORDER.forEach((type) => {
+          const item = ITEMS[type];
+          const count = inv[type];
+          const rate = getProductionRatePerMin(type);
+
+          desktopHTML += `
+            <div class="flex items-center gap-2 bg-slate-950/65 border border-slate-800/90 rounded-lg px-2 py-1">
+              <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${item.color}; box-shadow: 0 0 8px ${item.color}"></span>
+              <div>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[10px] text-slate-400 font-medium">${item.short}</span>
+                  <span class="font-mono-num text-xs font-bold text-white">${count}</span>
+                </div>
+                <div class="font-mono-num text-[9px] text-slate-400 leading-none">${rate}/m</div>
+              </div>
+            </div>
+          `;
+
+          mobileHTML += `
+            <div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900/90 border border-slate-800 text-[11px]">
+              <span class="w-2 h-2 rounded-full" style="background:${item.color}"></span>
+              <span class="text-slate-300">${item.short}:</span>
+              <span class="font-mono-num font-bold text-white">${count}</span>
+              <span class="font-mono-num text-[9px] text-slate-400">(${rate}/m)</span>
+            </div>
+          `;
+        });
+
+        desktopContainer.innerHTML = desktopHTML;
+        mobileContainer.innerHTML = mobileHTML;
+
+        updateCampaignUI();
+        if (state.selectedBuildingId !== null) {
+          updateInspector();
+        }
+      }
+
+      function updateCampaignUI() {
+        const badgeEl = document.getElementById('stage-badge');
+        const rewardEl = document.getElementById('stage-reward-badge');
+        const titleEl = document.getElementById('stage-title');
+        const descEl = document.getElementById('stage-desc');
+        const goalsEl = document.getElementById('stage-goals');
+        const unlockTextEl = document.getElementById('stage-unlock-text');
+
+        if (state.sandboxMode) {
+          badgeEl.textContent = 'FREEPLAY SANDBOX';
+          rewardEl.textContent = 'UNLIMITED';
+          titleEl.textContent = 'Infinite Industrial Expansion';
+          descEl.textContent = 'All 5 campaign stages completed! Expand your automated clockwork factory freely.';
+          unlockTextEl.textContent = 'All 8 Buildings Unlocked';
+          goalsEl.innerHTML = `
+            <div class="text-xs text-slate-300 flex justify-between">
+              <span>Vaulted Robot Components:</span>
+              <span class="font-mono-num font-bold text-rose-400">${state.stats.storedTotal.robot_component}</span>
+            </div>
+            <div class="text-xs text-slate-300 flex justify-between">
+              <span>Total Credits Earned:</span>
+              <span class="font-mono-num font-bold text-emerald-400">$${state.totalCreditsEarned.toLocaleString()}</span>
+            </div>
+          `;
+          return;
+        }
+
+        const stage = STAGES[Math.min(state.stageIndex, STAGES.length - 1)];
+        badgeEl.textContent = `STAGE ${state.stageIndex + 1} / ${STAGES.length}`;
+        rewardEl.textContent = `+$${stage.rewardCredits}`;
+        titleEl.textContent = stage.title;
+        descEl.textContent = stage.desc;
+        unlockTextEl.textContent = stage.unlockText;
+
+        goalsEl.innerHTML = stage.goals.map((g) => {
+          const val = g.getVal(state);
+          const pct = Math.min(100, Math.round((val / g.target) * 100));
+          const done = val >= g.target;
+          return `
+            <div>
+              <div class="flex justify-between text-[11px] mb-1">
+                <span class="${done ? 'text-emerald-300 font-semibold' : 'text-slate-200'}">${done ? '✓ ' : ''}${g.label}</span>
+                <span class="font-mono-num font-bold ${done ? 'text-emerald-400' : 'text-amber-300'}">${val} / ${g.target}</span>
+              </div>
+              <div class="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
+                <div class="h-full rounded-full transition-all duration-300 ${done ? 'bg-emerald-400' : 'bg-amber-400'}" style="width: ${pct}%"></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      function checkCampaignProgress() {
+        if (state.campaignComplete || state.sandboxMode) return;
+        const stage = STAGES[state.stageIndex];
+        if (!stage) return;
+
+        const allMet = stage.goals.every((g) => g.getVal(state) >= g.target);
+        if (!allMet) return;
+
+        state.credits += stage.rewardCredits;
+        state.totalCreditsEarned += stage.rewardCredits;
+        sound.playStageComplete();
+
+        if (state.stageIndex < STAGES.length - 1) {
+          state.stageIndex += 1;
+          showToast(`Stage Complete! +$${stage.rewardCredits} Awarded!`);
+          logAIDecision(`STAGE ${state.stageIndex} UNLOCKED (+$${stage.rewardCredits} reward).`);
+          updateHotbarUI();
+          saveFactoryToLocalStorage(true);
+        } else {
+          state.campaignComplete = true;
+          logAIDecision('ALL 5 CAMPAIGN STAGES COMPLETED!');
+          saveFactoryToLocalStorage(true);
+          openVictoryModal();
+        }
+      }
+
+      function openVictoryModal() {
+        const modal = document.getElementById('victory-modal');
+        const statsGrid = document.getElementById('victory-stats');
+        statsGrid.innerHTML = `
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3">
+            <div class="text-[10px] uppercase tracking-wider text-slate-400">Robot Components Vaulted</div>
+            <div class="font-mono-num font-bold text-lg text-rose-400 mt-0.5">${state.stats.storedTotal.robot_component}</div>
+          </div>
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3">
+            <div class="text-[10px] uppercase tracking-wider text-slate-400">Total Credits Earned</div>
+            <div class="font-mono-num font-bold text-lg text-amber-300 mt-0.5">$${state.totalCreditsEarned.toLocaleString()}</div>
+          </div>
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3">
+            <div class="text-[10px] uppercase tracking-wider text-slate-400">Structures Built</div>
+            <div class="font-mono-num font-bold text-lg text-cyan-300 mt-0.5">${state.buildings.size}</div>
+          </div>
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3">
+            <div class="text-[10px] uppercase tracking-wider text-slate-400">Grid Power Efficiency</div>
+            <div class="font-mono-num font-bold text-lg text-emerald-400 mt-0.5">${Math.round(state.powerEfficiency * 100)}%</div>
+          </div>
+        `;
+        modal.classList.remove('hidden');
+      }
+
+      function updateInspector() {
+        const b = state.buildings.get(state.selectedBuildingId);
+        if (!b) {
+          selectBuilding(null);
+          return;
+        }
+        const def = BUILDINGS[b.type];
+        document.getElementById('insp-name').textContent = def.name;
+        document.getElementById('insp-coords').textContent = `[${b.gx}, ${b.gz}] • ${DIR_VECTORS[b.dir].name.split(' ')[0]}`;
+        document.getElementById('insp-subtitle').textContent = b.type === 'miner'
+          ? (b.veinType === 'crystal' ? 'Extracting Cyan Crystals (1.5s)' : b.veinType === 'ore' ? 'Extracting Amber Ore (1.5s)' : 'Surface Extraction (2.5s)')
+          : def.desc;
+
+        const statusEl = document.getElementById('insp-status-badge');
+        const st = state.paused ? 'PAUSED' : b.status;
+        statusEl.textContent = st;
+        if (st === 'ACTIVE') {
+          statusEl.className = 'px-2 py-0.5 rounded text-[11px] font-display font-bold tracking-wider uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        } else if (st === 'STARVED') {
+          statusEl.className = 'px-2 py-0.5 rounded text-[11px] font-display font-bold tracking-wider uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40';
+        } else if (st === 'BLOCKED') {
+          statusEl.className = 'px-2 py-0.5 rounded text-[11px] font-display font-bold tracking-wider uppercase bg-orange-500/20 text-orange-300 border border-orange-500/40';
+        } else if (st === 'LOW POWER') {
+          statusEl.className = 'px-2 py-0.5 rounded text-[11px] font-display font-bold tracking-wider uppercase bg-red-500/20 text-red-300 border border-red-500/40';
+        } else {
+          statusEl.className = 'px-2 py-0.5 rounded text-[11px] font-display font-bold tracking-wider uppercase bg-slate-700/40 text-slate-300 border border-slate-600/40';
+        }
+
+        const pEl = document.getElementById('insp-power-text');
+        if (def.powerGen > 0) {
+          pEl.textContent = `+${def.powerGen}W`;
+          pEl.className = 'font-mono-num text-xs text-emerald-400 font-semibold';
+        } else {
+          pEl.textContent = `-${def.powerDraw}W`;
+          pEl.className = 'font-mono-num text-xs text-cyan-300 font-semibold';
+        }
+
+        const boostBadge = document.getElementById('insp-boost-badge');
+        if ((b.overclockMult || 1.0) > 1.01) {
+          boostBadge.classList.remove('hidden');
+          document.getElementById('insp-boost-val').textContent = `+${Math.round((b.overclockMult - 1) * 100)}% Speed`;
+        } else {
+          boostBadge.classList.add('hidden');
+        }
+
+        const progWrap = document.getElementById('insp-progress-wrap');
+        if (['miner', 'furnace', 'assembler'].includes(b.type)) {
+          progWrap.classList.remove('hidden');
+          const pct = Math.min(100, Math.round(b.progress * 100));
+          document.getElementById('insp-progress-pct').textContent = `${pct}%`;
+          document.getElementById('insp-progress-bar').style.width = `${pct}%`;
+        } else {
+          progWrap.classList.add('hidden');
+        }
+
+        const recipeWrap = document.getElementById('insp-recipe-wrap');
+        if (b.type === 'assembler') {
+          recipeWrap.classList.remove('hidden');
+          const rList = document.getElementById('insp-recipe-list');
+          const choices = [
+            { id: 'auto', name: 'Auto-Recipe (Smart Buffer)', duration: 'AUTO', summary: 'Automatically crafts from incoming buffered inputs' },
+            ...Object.values(ASSEMBLER_RECIPES)
+          ];
+          rList.innerHTML = choices.map((rec) => {
+            const active = b.recipeMode === rec.id;
+            return `
+              <button data-recipe="${rec.id}" class="recipe-choice-btn text-left px-2.5 py-1.5 rounded-lg border text-xs transition ${
+                active
+                  ? 'bg-cyan-500/20 border-cyan-400 text-white font-semibold'
+                  : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:border-slate-600'
+              }">
+                <div class="flex items-center justify-between">
+                  <span>${rec.name}</span>
+                  <span class="text-[10px] font-mono-num text-cyan-300">${typeof rec.duration === 'number' ? rec.duration + 's' : rec.duration}</span>
+                </div>
+                <div class="text-[10px] text-slate-400 mt-0.5">${rec.summary}</div>
+              </button>
+            `;
+          }).join('');
+
+          rList.querySelectorAll('.recipe-choice-btn').forEach((btn) => {
+            btn.onclick = () => {
+              const newRec = btn.getAttribute('data-recipe');
+              if (b.recipeMode !== newRec) {
+                b.recipeMode = newRec;
+                b.progress = 0;
+                sound.playClick();
+                updateInspector();
+              }
+            };
+          });
+        } else {
+          recipeWrap.classList.add('hidden');
+        }
+
+        const storageWrap = document.getElementById('insp-storage-wrap');
+        if (b.type === 'storage') {
+          storageWrap.classList.remove('hidden');
+          const togBtn = document.getElementById('insp-storage-toggle');
+          togBtn.textContent = b.autoOutput ? 'ON' : 'OFF';
+          togBtn.className = b.autoOutput
+            ? 'px-2.5 py-1 rounded-md text-xs font-bold border bg-emerald-500/20 border-emerald-400 text-emerald-300 transition'
+            : 'px-2.5 py-1 rounded-md text-xs font-bold border bg-slate-800 border-slate-600 text-slate-300 transition';
+          togBtn.onclick = () => {
+            b.autoOutput = !b.autoOutput;
+            sound.playClick();
+            updateInspector();
+          };
+        } else {
+          storageWrap.classList.add('hidden');
+        }
+
+        const inSec = document.getElementById('insp-inputs-section');
+        const outSec = document.getElementById('insp-outputs-section');
+        const inGrid = document.getElementById('insp-inputs-grid');
+        const outGrid = document.getElementById('insp-outputs-grid');
+
+        if (b.type === 'furnace' || b.type === 'assembler') {
+          inSec.classList.remove('hidden');
+          const keys = b.type === 'furnace' ? ['ore', 'crystal'] : ['ore', 'metal', 'energy_cell', 'circuit'];
+          const maxCap = b.type === 'furnace' ? 5 : 6;
+          inGrid.innerHTML = keys.map((k) => renderBufferSlot(k, b.inputBuffer[k] || 0, maxCap)).join('');
+        } else {
+          inSec.classList.add('hidden');
+        }
+
+        if (['miner', 'furnace', 'assembler', 'storage', 'conveyor', 'splitter'].includes(b.type)) {
+          outSec.classList.remove('hidden');
+          if (b.type === 'storage') {
+            const total = getTotalBufferCount(b.storedItems);
+            outGrid.innerHTML = ITEM_ORDER.map((t) => renderBufferSlot(t, b.storedItems[t] || 0, 150)).join('') +
+              `<div class="col-span-2 text-[11px] font-mono-num text-slate-400 text-right">Total Vaulted: ${total} / 150</div>`;
+          } else if (b.type === 'conveyor') {
+            outGrid.innerHTML = `<div class="col-span-2 bg-slate-900/80 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 flex justify-between">
+              <span>Items on Belt:</span>
+              <span class="font-mono-num font-bold text-amber-300">${b.items.length}</span>
+            </div>`;
+          } else if (b.type === 'splitter') {
+            outGrid.innerHTML = `<div class="col-span-2 bg-slate-900/80 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 flex justify-between">
+              <span>Junction Buffer:</span>
+              <span class="font-mono-num font-bold text-cyan-300">${b.splitterItem ? ITEMS[b.splitterItem.type].name : 'Empty'}</span>
+            </div>`;
+          } else {
+            const outKeys = b.type === 'miner'
+              ? [b.veinType === 'crystal' ? 'crystal' : 'ore']
+              : b.type === 'furnace'
+                ? ['metal', 'energy_cell']
+                : ['circuit', 'robot_component', 'energy_cell'];
+            const maxOut = b.type === 'miner' ? 3 : 5;
+            outGrid.innerHTML = outKeys.map((k) => renderBufferSlot(k, b.outputBuffer[k] || 0, maxOut)).join('');
+          }
+        } else {
+          outSec.classList.add('hidden');
+        }
+
+        document.getElementById('insp-refund').textContent = `+$${Math.floor(def.cost * 0.75)}`;
+      }
+
+      function renderBufferSlot(itemType, count, max) {
+        const info = ITEMS[itemType];
+        return `
+          <div class="bg-slate-900/90 border border-slate-800 rounded-lg px-2 py-1.5 flex items-center justify-between">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full" style="background:${info.color}"></span>
+              <span class="text-[11px] text-slate-200 font-medium">${info.short}</span>
+            </div>
+            <span class="font-mono-num text-xs font-bold text-white">${count}<span class="text-slate-500">/${max}</span></span>
+          </div>
+        `;
+      }
+
+      let toastTimer = null;
+      function showToast(msg) {
+        const el = document.getElementById('toast-banner');
+        el.textContent = msg;
+        el.classList.remove('hidden');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          el.classList.add('hidden');
+        }, 2600);
+      }
+
+      function spawnWorldFloatText(text, wx, wy, wz, colorHex = '#fbbf24') {
+        if (!camera || !renderer) return;
+        const vec = new THREE.Vector3(wx, wy, wz);
+        vec.project(camera);
+        if (vec.z > 1) return;
+        const sx = (vec.x * 0.5 + 0.5) * window.innerWidth;
+        const sy = (-(vec.y * 0.5) + 0.5) * window.innerHeight;
+
+        const el = document.createElement('div');
+        el.className = 'world-float-label font-mono-num font-bold text-xs';
+        el.style.left = `${sx}px`;
+        el.style.top = `${sy}px`;
+        el.style.color = colorHex;
+        el.textContent = text;
+        document.body.appendChild(el);
+        setTimeout(() => {
+          el.remove();
+        }, 1500);
+      }
+
+      function togglePause() {
+        state.paused = !state.paused;
+        document.getElementById('icon-pause').textContent = state.paused ? '▶' : '❚❚';
+        document.getElementById('label-pause').textContent = state.paused ? 'Paused' : 'Running';
+        sound.playClick();
+        updateHUD();
+      }
+
+      // =========================================================================
+      // 14. SAVE, LOAD & NEW FACTORY RESET (LOCALSTORAGE)
+      // =========================================================================
+      function saveFactoryToLocalStorage(silent = false) {
+        try {
+          const buildingsData = [];
+          const beltItemsData = [];
+          const splitterItemsData = [];
+
+          state.buildings.forEach((b) => {
+            buildingsData.push({
+              id: b.id,
+              gx: b.gx,
+              gz: b.gz,
+              type: b.type,
+              dir: b.dir,
+              recipeMode: b.recipeMode,
+              activeRecipeId: b.activeRecipeId,
+              progress: b.progress,
+              inputBuffer: b.inputBuffer,
+              outputBuffer: b.outputBuffer,
+              storedItems: b.storedItems,
+              autoOutput: b.autoOutput,
+              rrIndex: b.rrIndex
+            });
+
+            if (b.type === 'conveyor' && b.items.length > 0) {
+              b.items.forEach((it) => {
+                beltItemsData.push({
+                  gx: b.gx,
+                  gz: b.gz,
+                  type: it.type,
+                  progress: it.progress,
+                  entryFromDir: it.entryFromDir,
+                  fromStorage: Boolean(it.fromStorage)
+                });
+              });
+            }
+
+            if (b.type === 'splitter' && b.splitterItem) {
+              splitterItemsData.push({
+                gx: b.gx,
+                gz: b.gz,
+                type: b.splitterItem.type,
+                fromStorage: Boolean(b.splitterItem.fromStorage)
+              });
+            }
+          });
+
+          const veinsList = [];
+          state.veins.forEach((type, k) => {
+            const [gx, gz] = k.split(',').map(Number);
+            veinsList.push({ gx, gz, type });
+          });
+
+          const payload = {
+            version: 2,
+            credits: state.credits,
+            totalCreditsEarned: state.totalCreditsEarned,
+            stageIndex: state.stageIndex,
+            campaignComplete: state.campaignComplete,
+            sandboxMode: state.sandboxMode,
+            simSpeed: state.simSpeed,
+            veins: veinsList,
+            buildings: buildingsData,
+            beltItems: beltItemsData,
+            splitterItems: splitterItemsData,
+            stats: state.stats,
+            aiState: {
+              plannedLines: aiAgent.plannedLines,
+              lineCounter: aiAgent.lineCounter
+            },
+            camera: {
+              targetX: state.camera.targetX,
+              targetZ: state.camera.targetZ,
+              yaw: state.camera.yaw,
+              pitch: state.camera.pitch,
+              distance: state.camera.distance
+            }
+          };
+
+          localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+          if (!silent) {
+            showToast('Factory State Saved');
+            sound.playClick();
+          }
+        } catch (err) {
+          console.warn('Save failed:', err);
+        }
+      }
+
+      function clearEntireFactory() {
+        while (itemsGroup.children.length > 0) itemsGroup.remove(itemsGroup.children[0]);
+        while (buildingsGroup.children.length > 0) buildingsGroup.remove(buildingsGroup.children[0]);
+        while (conduitsGroup.children.length > 0) conduitsGroup.remove(conduitsGroup.children[0]);
+
+        state.grid = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null));
+        state.buildings.clear();
+        state.nextBuildingId = 1;
+        aiAgent.actionQueue = [];
+        aiAgent.plannedLines = [];
+        aiAgent.lineCounter = 0;
+        selectBuilding(null);
+      }
+
+      function loadFactoryFromLocalStorage(manualClick = false) {
+        try {
+          const raw = localStorage.getItem(SAVE_KEY);
+          if (!raw) {
+            if (manualClick) {
+              showToast('No saved factory found in storage');
+              sound.playError();
+            }
+            return false;
+          }
+          const data = JSON.parse(raw);
+          if (!data || !Array.isArray(data.buildings)) return false;
+
+          clearEntireFactory();
+
+          state.credits = typeof data.credits === 'number' ? data.credits : 650;
+          state.totalCreditsEarned = typeof data.totalCreditsEarned === 'number' ? data.totalCreditsEarned : state.credits;
+          state.stageIndex = typeof data.stageIndex === 'number' ? data.stageIndex : 0;
+          state.campaignComplete = Boolean(data.campaignComplete);
+          state.sandboxMode = Boolean(data.sandboxMode);
+          state.simSpeed = data.simSpeed === 3 ? 3 : 1;
+          document.getElementById('btn-speed').textContent = `${state.simSpeed}x`;
+
+          if (data.stats) {
+            state.stats = {
+              produced: { ore: 0, crystal: 0, metal: 0, energy_cell: 0, circuit: 0, robot_component: 0, ...data.stats.produced },
+              storedTotal: { ore: 0, crystal: 0, metal: 0, energy_cell: 0, circuit: 0, robot_component: 0, ...data.stats.storedTotal },
+              buildingsPlaced: data.stats.buildingsPlaced || 0
+            };
+          }
+
+          if (data.aiState) {
+            aiAgent.plannedLines = data.aiState.plannedLines || [];
+            aiAgent.lineCounter = data.aiState.lineCounter || 0;
+          }
+
+          generateResourceVeins(data.veins || null);
+
+          data.buildings.forEach((bData) => {
+            placeBuilding(bData.gx, bData.gz, bData.type, bData.dir, {
+              free: true,
+              id: bData.id,
+              recipeMode: bData.recipeMode || 'auto',
+              activeRecipeId: bData.activeRecipeId || null,
+              progress: bData.progress,
+              inputBuffer: bData.inputBuffer,
+              outputBuffer: bData.outputBuffer,
+              storedItems: bData.storedItems,
+              autoOutput: bData.autoOutput,
+              rrIndex: bData.rrIndex
+            });
+            const b = getBuildingAt(bData.gx, bData.gz);
+            if (b) b.progress = bData.progress || 0;
+          });
+
+          if (Array.isArray(data.beltItems)) {
+            data.beltItems.forEach((it) => {
+              const belt = getBuildingAt(it.gx, it.gz);
+              if (belt && belt.type === 'conveyor') {
+                const mesh = createItemMesh(it.type);
+                const itemObj = {
+                  type: it.type,
+                  progress: it.progress,
+                  entryFromDir: it.entryFromDir,
+                  fromStorage: Boolean(it.fromStorage),
+                  mesh
+                };
+                belt.items.push(itemObj);
+                updateBeltItemVisual(belt, itemObj);
+              }
+            });
+            state.buildings.forEach((b) => {
+              if (b.type === 'conveyor') b.items.sort((a, c) => c.progress - a.progress);
+            });
+          }
+
+          if (Array.isArray(data.splitterItems)) {
+            data.splitterItems.forEach((si) => {
+              const splitter = getBuildingAt(si.gx, si.gz);
+              if (splitter && splitter.type === 'splitter') {
+                const mesh = createItemMesh(si.type);
+                const wPos = gridToWorld(splitter.gx, splitter.gz);
+                mesh.position.set(wPos.x, 0.75, wPos.z);
+                splitter.splitterItem = {
+                  type: si.type,
+                  fromStorage: Boolean(si.fromStorage),
+                  mesh
+                };
+              }
+            });
+          }
+
+          if (data.camera) {
+            state.camera.targetX = state.camera.curTargetX = data.camera.targetX || 0;
+            state.camera.targetZ = state.camera.curTargetZ = data.camera.targetZ || 0;
+            state.camera.yaw = state.camera.curYaw = data.camera.yaw ?? Math.PI / 4;
+            state.camera.pitch = state.camera.curPitch = data.camera.pitch ?? 0.80;
+            state.camera.distance = state.camera.curDistance = data.camera.distance ?? 35;
+          }
+
+          recomputeOverclockBonuses();
+          rebuildPowerConduitLines();
+          buildHotbarUI();
+          updateHUD();
+
+          if (manualClick) {
+            showToast('Saved Factory Restored');
+            sound.playClick();
+          }
+          return true;
+        } catch (err) {
+          console.warn('Load failed:', err);
+          return false;
+        }
+      }
+
+      function resetFactoryState() {
+        localStorage.removeItem(SAVE_KEY);
+        if (aiAgent.enabled) toggleAIAutoPlay(false);
+        clearEntireFactory();
+
+        state.credits = 650;
+        state.totalCreditsEarned = 650;
+        state.stageIndex = 0;
+        state.campaignComplete = false;
+        state.sandboxMode = false;
+        state.paused = false;
+        state.simSpeed = 1;
+        state.simTime = 0;
+        state.activeTool = null;
+        state.placementDir = 0;
+        document.getElementById('btn-speed').textContent = '1x';
+
+        state.stats = {
+          produced: { ore: 0, crystal: 0, metal: 0, energy_cell: 0, circuit: 0, robot_component: 0 },
+          storedTotal: { ore: 0, crystal: 0, metal: 0, energy_cell: 0, circuit: 0, robot_component: 0 },
+          buildingsPlaced: 0
+        };
+        for (const k of ITEM_ORDER) state.productionLog[k] = [];
+
+        state.camera.targetX = 0;
+        state.camera.targetZ = 0;
+        state.camera.yaw = Math.PI / 4;
+        state.camera.pitch = 0.80;
+        state.camera.distance = 35;
+
+        aiAgent.logs = [];
+        logAIDecision('New factory initialized. Ready for manual or AI operation.');
+
+        generateResourceVeins(null);
+        buildHotbarUI();
+        updateHUD();
+        updateGhostPreview();
+        showToast('New Factory Initialized ($650)');
+      }
+
+      // =========================================================================
+      // 15. HUD BUTTON BINDINGS & MAIN SIMULATION LOOP
+      // =========================================================================
+      function setupHUDButtons() {
+        document.getElementById('btn-ai-toggle').onclick = () => toggleAIAutoPlay();
+
+        document.getElementById('btn-ai-follow').onclick = () => {
+          aiAgent.followCamera = !aiAgent.followCamera;
+          const btn = document.getElementById('btn-ai-follow');
+          btn.textContent = `Follow AI: ${aiAgent.followCamera ? 'ON' : 'OFF'}`;
+          btn.className = aiAgent.followCamera
+            ? 'px-2.5 py-1.5 rounded-lg bg-cyan-500/20 border border-cyan-400 text-[11px] font-semibold text-cyan-200 transition'
+            : 'px-2.5 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-[11px] font-semibold text-slate-300 transition';
+          sound.playClick();
+        };
+
+        document.getElementById('btn-speed').onclick = () => {
+          state.simSpeed = state.simSpeed === 1 ? 3 : 1;
+          document.getElementById('btn-speed').textContent = `${state.simSpeed}x`;
+          sound.playClick();
+        };
+
+        document.getElementById('btn-pause').onclick = togglePause;
+        document.getElementById('btn-save').onclick = () => saveFactoryToLocalStorage(false);
+        document.getElementById('btn-load').onclick = () => loadFactoryFromLocalStorage(true);
+
+        document.getElementById('btn-mute').onclick = () => {
+          sound.muted = !sound.muted;
+          document.getElementById('icon-sound-on').classList.toggle('hidden', sound.muted);
+          document.getElementById('icon-sound-off').classList.toggle('hidden', !sound.muted);
+        };
+
+        document.getElementById('btn-reset').onclick = () => {
+          document.getElementById('reset-modal').classList.remove('hidden');
+          sound.playClick();
+        };
+
+        document.getElementById('btn-reset-cancel').onclick = () => {
+          document.getElementById('reset-modal').classList.add('hidden');
+        };
+
+        document.getElementById('btn-reset-confirm').onclick = () => {
+          document.getElementById('reset-modal').classList.add('hidden');
+          document.getElementById('victory-modal').classList.add('hidden');
+          resetFactoryState();
+        };
+
+        document.getElementById('insp-close').onclick = () => {
+          selectBuilding(null);
+          sound.playClick();
+        };
+
+        document.getElementById('insp-rotate-btn').onclick = () => {
+          if (state.selectedBuildingId !== null) rotateBuilding(state.buildings.get(state.selectedBuildingId));
+        };
+
+        document.getElementById('insp-delete-btn').onclick = () => {
+          if (state.selectedBuildingId !== null) removeBuilding(state.buildings.get(state.selectedBuildingId));
+        };
+
+        document.getElementById('btn-continue-sandbox').onclick = () => {
+          state.sandboxMode = true;
+          document.getElementById('victory-modal').classList.add('hidden');
+          buildHotbarUI();
+          updateHUD();
+          saveFactoryToLocalStorage(true);
+          showToast('Freeplay Mode Activated!');
+        };
+
+        document.getElementById('btn-victory-restart').onclick = () => {
+          document.getElementById('victory-modal').classList.add('hidden');
+          resetFactoryState();
+        };
+      }
+
+      let lastFrameTime = 0;
+      let uiRefreshTimer = 0;
+      let autoSaveTimer = 0;
+
+      function gameLoop(nowMs) {
+        requestAnimationFrame(gameLoop);
+
+        const nowSec = nowMs * 0.001;
+        const dt = lastFrameTime === 0 ? 0.016 : Math.min(0.1, nowSec - lastFrameTime);
+        lastFrameTime = nowSec;
+
+        updateCameraTransform(dt);
+        stepSimulation(dt);
+        stepAIAgent(dt, nowSec);
+        animateScene(dt, nowSec);
+
+        uiRefreshTimer += dt;
+        if (uiRefreshTimer >= 0.15) {
+          uiRefreshTimer = 0;
+          updateHUD();
+        }
+
+        autoSaveTimer += dt;
+        if (autoSaveTimer >= 12.0) {
+          autoSaveTimer = 0;
+          saveFactoryToLocalStorage(true);
+        }
+
+        renderer.render(scene, camera);
+      }
+
+      window.onload = function () {
+        initThree();
+        initAIDrone3D();
+        setupInputListeners();
+        setupHUDButtons();
+
+        const loaded = loadFactoryFromLocalStorage(false);
+        if (!loaded) {
+          generateResourceVeins(null);
+          logAIDecision('AI Architect initialized & ready.');
+        } else {
+          logAIDecision('Saved factory restored from localStorage.');
+        }
+
+        buildHotbarUI();
+        updateHUD();
+
+        showToast(loaded ? 'Saved Factory Restored — Press [P] for AI Autopilot' : 'CLOCKWORK FACTORY Ready — Build manually or press [P] for AI Autopilot!');
+        requestAnimationFrame(gameLoop);
+      };
+    })();
+  </script>
+</body>
+</html>

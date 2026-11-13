@@ -1,0 +1,69 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Glass Origami Crane</title><style>
+:root{color-scheme:dark;--ink:#e8f3ff;--muted:#a5b7ce;--edge:#ffffff26;--glass:#0d1735c9;--accent:#72f4ed}*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#060d20;color:var(--ink);font:14px/1.4 system-ui,-apple-system,Segoe UI,sans-serif}canvas{display:block}#scene{position:fixed;inset:0} .hud{position:fixed;z-index:4;pointer-events:none}.panel{border:1px solid var(--edge);background:linear-gradient(135deg,#15244bdc,#0b112bcf);backdrop-filter:blur(17px);border-radius:17px;padding:16px 19px;box-shadow:0 12px 48px #0005}.top{top:20px;left:20px}.right{top:20px;right:20px;max-width:340px}.bottom{bottom:18px;left:50%;transform:translateX(-50%);text-align:center}.eyebrow{color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:.19em;font-weight:800}h1,h2,p{margin:0}h1{font-size:23px;letter-spacing:.02em}h2{font-size:18px}p{color:var(--muted);margin-top:6px}button,select,input{font:inherit}button{border:1px solid #ffffff40;background:#ffffff14;color:white;border-radius:10px;padding:10px 14px;cursor:pointer;pointer-events:auto;font-weight:750}button:hover{background:#ffffff29}button.primary{background:linear-gradient(110deg,#0fa9b8,#6761ff);border:0}button.active{background:#1a8a7d}input[type=range]{accent-color:#76f5dd;pointer-events:auto}.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.stats{display:flex;gap:14px;margin-top:10px}.stat{min-width:66px}.stat b{display:block;font-size:20px}.stat small{font-size:10px;letter-spacing:.13em;color:#a5b7ce;text-transform:uppercase}.meter{height:8px;overflow:hidden;border-radius:8px;background:#ffffff22;margin-top:8px}.fill{height:100%;background:linear-gradient(90deg,#14ebcf,#6c95ff);width:100%;transition:width .2s}.overlay{position:fixed;z-index:10;inset:0;display:flex;align-items:center;justify-content:center;background:#020716c9;backdrop-filter:blur(8px)}.overlay.hidden{display:none}.dialog{max-width:460px;text-align:center;padding:36px 34px;border:1px solid #ffffff3c;border-radius:24px;background:linear-gradient(145deg,#203263,#0b1130);box-shadow:0 30px 90px #0009}.dialog h1{font-size:38px;margin:8px 0}.dialog p{line-height:1.7;margin:12px 0 23px}.help{font-size:12px;color:#a9bbd2}.progress{height:4px;background:#ffffff1b;border-radius:6px;margin:12px 0}.progress span{display:block;height:100%;background:#7df3ed}kbd{background:#fff2;border-radius:4px;padding:2px 4px;font:11px monospace}
+.viewport{width:100vw;height:100vh;display:grid;place-items:center}.viewport svg{width:min(100vw,133.33vh);height:min(100vh,75vw);filter:drop-shadow(0 0 60px #379cdd23)}.tag{position:fixed;top:22px;left:28px;color:#b0e9fc;font-size:11px;letter-spacing:.2em;line-height:2}.tag span{color:#879bb4}.crane{animation:float 5s ease-in-out infinite}@keyframes float{50%{transform:translateY(-8px)}}</style></head><body><div class="viewport"><svg viewBox="0 0 1200 900" role="img" aria-label="Crystal-clear glass sphere enclosing an intricate origami crane" xmlns="http://www.w3.org/2000/svg"><defs>
+<radialGradient id="bg"><stop stop-color="#193153"/><stop offset=".62" stop-color="#0a1835"/><stop offset="1" stop-color="#030817"/></radialGradient>
+<radialGradient id="glass" cx="30%" cy="24%" r="82%"><stop stop-color="#e9fbff" stop-opacity=".19"/><stop offset=".20" stop-color="#92cded" stop-opacity=".045"/><stop offset=".54" stop-color="#406fba" stop-opacity=".11"/><stop offset=".82" stop-color="#bcefff" stop-opacity=".22"/><stop offset=".96" stop-color="#dbffff" stop-opacity=".40"/><stop offset="1" stop-color="#71a4e6" stop-opacity=".13"/></radialGradient>
+<linearGradient id="paper" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset=".38" stop-color="#beddf5"/><stop offset=".72" stop-color="#648ab9"/><stop offset="1" stop-color="#ecfaff"/></linearGradient>
+<linearGradient id="wing" x1=".1" y1="0" x2=".7" y2="1"><stop stop-color="#fafcff"/><stop offset=".25" stop-color="#afdcf4"/><stop offset=".55" stop-color="#466a9e"/><stop offset=".85" stop-color="#e8fbff"/></linearGradient>
+<linearGradient id="facet" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#4c709f"/><stop offset=".6" stop-color="#c4ebff"/><stop offset="1" stop-color="#fff"/></linearGradient>
+<radialGradient id="highlight"><stop stop-color="#fff" stop-opacity=".95"/><stop offset=".2" stop-color="#f6ffff" stop-opacity=".42"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<linearGradient id="rim" x1=".1" y1="0" x2=".9" y2="1"><stop stop-color="#fff" stop-opacity=".86"/><stop offset=".28" stop-color="#7ce4ff" stop-opacity=".28"/><stop offset=".63" stop-color="#fff" stop-opacity=".05"/><stop offset=".89" stop-color="#b6f7ff" stop-opacity=".79"/><stop offset="1" stop-color="#fff" stop-opacity=".3"/></linearGradient>
+<filter id="shadow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="26"/></filter>
+<filter id="crane-shadow" x="-60%" y="-60%" width="220%" height="220%"><feDropShadow dx="4" dy="16" stdDeviation="12" flood-color="#04142a" flood-opacity=".64"/></filter>
+<filter id="blur"><feGaussianBlur stdDeviation="5"/></filter>
+<clipPath id="clip"><circle cx="600" cy="440" r="308"/></clipPath>
+</defs><rect width="1200" height="900" fill="url(#bg)"/>
+<g opacity=".6"><circle cx="53" cy="83" r="0.55" fill="#b9faff" opacity=".2"/><circle cx="244" cy="136" r="1.1" fill="#b9faff" opacity=".3"/><circle cx="435" cy="295" r="1.6500000000000001" fill="#b9faff" opacity=".4"/><circle cx="626" cy="560" r="2.2" fill="#b9faff" opacity=".5"/><circle cx="817" cy="111" r="0.55" fill="#b9faff" opacity=".6"/><circle cx="1008" cy="588" r="1.1" fill="#b9faff" opacity=".2"/><circle cx="1199" cy="351" r="1.6500000000000001" fill="#b9faff" opacity=".3"/><circle cx="190" cy="220" r="2.2" fill="#b9faff" opacity=".4"/><circle cx="381" cy="195" r="0.55" fill="#b9faff" opacity=".5"/><circle cx="572" cy="276" r="1.1" fill="#b9faff" opacity=".6"/><circle cx="763" cy="463" r="1.6500000000000001" fill="#b9faff" opacity=".2"/><circle cx="954" cy="756" r="2.2" fill="#b9faff" opacity=".3"/><circle cx="1145" cy="335" r="0.55" fill="#b9faff" opacity=".4"/><circle cx="136" cy="20" r="1.1" fill="#b9faff" opacity=".5"/><circle cx="327" cy="631" r="1.6500000000000001" fill="#b9faff" opacity=".6"/><circle cx="518" cy="528" r="2.2" fill="#b9faff" opacity=".2"/><circle cx="709" cy="531" r="0.55" fill="#b9faff" opacity=".3"/><circle cx="900" cy="640" r="1.1" fill="#b9faff" opacity=".4"/><circle cx="1091" cy="35" r="1.6500000000000001" fill="#b9faff" opacity=".5"/><circle cx="82" cy="356" r="2.2" fill="#b9faff" opacity=".6"/><circle cx="273" cy="783" r="0.55" fill="#b9faff" opacity=".2"/><circle cx="464" cy="496" r="1.1" fill="#b9faff" opacity=".3"/><circle cx="655" cy="315" r="1.6500000000000001" fill="#b9faff" opacity=".4"/><circle cx="846" cy="240" r="2.2" fill="#b9faff" opacity=".5"/><circle cx="1037" cy="271" r="0.55" fill="#b9faff" opacity=".6"/><circle cx="28" cy="408" r="1.1" fill="#b9faff" opacity=".2"/><circle cx="219" cy="651" r="1.6500000000000001" fill="#b9faff" opacity=".3"/><circle cx="410" cy="180" r="2.2" fill="#b9faff" opacity=".4"/><circle cx="601" cy="635" r="0.55" fill="#b9faff" opacity=".5"/><circle cx="792" cy="376" r="1.1" fill="#b9faff" opacity=".6"/><circle cx="983" cy="223" r="1.6500000000000001" fill="#b9faff" opacity=".2"/><circle cx="1174" cy="176" r="2.2" fill="#b9faff" opacity=".3"/><circle cx="165" cy="235" r="0.55" fill="#b9faff" opacity=".4"/><circle cx="356" cy="400" r="1.1" fill="#b9faff" opacity=".5"/><circle cx="547" cy="671" r="1.6500000000000001" fill="#b9faff" opacity=".6"/><circle cx="738" cy="228" r="2.2" fill="#b9faff" opacity=".2"/><circle cx="929" cy="711" r="0.55" fill="#b9faff" opacity=".3"/><circle cx="1120" cy="480" r="1.1" fill="#b9faff" opacity=".4"/><circle cx="111" cy="355" r="1.6500000000000001" fill="#b9faff" opacity=".5"/><circle cx="302" cy="336" r="2.2" fill="#b9faff" opacity=".6"/><circle cx="493" cy="423" r="0.55" fill="#b9faff" opacity=".2"/><circle cx="684" cy="616" r="1.1" fill="#b9faff" opacity=".3"/><circle cx="875" cy="95" r="1.6500000000000001" fill="#b9faff" opacity=".4"/><circle cx="1066" cy="500" r="2.2" fill="#b9faff" opacity=".5"/><circle cx="57" cy="191" r="0.55" fill="#b9faff" opacity=".6"/><circle cx="248" cy="808" r="1.1" fill="#b9faff" opacity=".2"/><circle cx="439" cy="711" r="1.6500000000000001" fill="#b9faff" opacity=".3"/><circle cx="630" cy="720" r="2.2" fill="#b9faff" opacity=".4"/><circle cx="821" cy="15" r="0.55" fill="#b9faff" opacity=".5"/><circle cx="1012" cy="236" r="1.1" fill="#b9faff" opacity=".6"/><circle cx="3" cy="563" r="1.6500000000000001" fill="#b9faff" opacity=".2"/><circle cx="194" cy="176" r="2.2" fill="#b9faff" opacity=".3"/><circle cx="385" cy="715" r="0.55" fill="#b9faff" opacity=".4"/><circle cx="576" cy="540" r="1.1" fill="#b9faff" opacity=".5"/><circle cx="767" cy="471" r="1.6500000000000001" fill="#b9faff" opacity=".6"/><circle cx="958" cy="508" r="2.2" fill="#b9faff" opacity=".2"/><circle cx="1149" cy="651" r="0.55" fill="#b9faff" opacity=".3"/><circle cx="140" cy="80" r="1.1" fill="#b9faff" opacity=".4"/><circle cx="331" cy="435" r="1.6500000000000001" fill="#b9faff" opacity=".5"/><circle cx="522" cy="76" r="2.2" fill="#b9faff" opacity=".6"/></g>
+<ellipse cx="605" cy="794" rx="290" ry="30" fill="#67a9e6" opacity=".28" filter="url(#shadow)"/>
+<ellipse cx="600" cy="753" rx="215" ry="28" fill="#5bcefc" opacity=".22" filter="url(#blur)"/>
+<circle cx="600" cy="440" r="308" fill="url(#glass)"/>
+<g clip-path="url(#clip)"><ellipse cx="765" cy="350" rx="94" ry="273" fill="#f2ffff" opacity=".05" transform="rotate(-25 765 350)"/>
+<g class="crane" filter="url(#crane-shadow)" transform="translate(0 4)">
+<!-- far wing, crystalline paper creases -->
+<path d="M563 477 L337 226 L460 379 L512 402 L615 485 Z" fill="url(#facet)" stroke="#d5f4ff" stroke-width="2"/>
+<path d="M337 226 L562 477 L476 411 Z" fill="#c4e4f5" opacity=".85"/>
+<path d="M337 226 L474 375 L446 384 Z" fill="#f5fcff" opacity=".66"/>
+<path d="M337 226 L535 446 M460 379 L562 477" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="1.5"/>
+<!-- outer right wing -->
+<path d="M577 481 L865 195 L785 368 L732 450 L636 510 Z" fill="url(#wing)" stroke="#d8f6ff" stroke-width="2.4"/>
+<path d="M865 195 L620 485 L755 357 Z" fill="#d5efff" opacity=".87"/>
+<path d="M865 195 L765 375 L713 397 Z" fill="#5077ae" opacity=".58"/>
+<path d="M865 195 L778 369 L732 450" fill="none" stroke="#fff" stroke-opacity=".64" stroke-width="2"/>
+<path d="M620 485 L765 375 L730 446 Z" fill="#f5ffff" opacity=".63"/>
+<!-- body -->
+<path d="M515 462 L630 448 L693 503 L609 567 L547 526 Z" fill="url(#paper)" stroke="#dff6ff" stroke-width="2.5"/>
+<path d="M515 462 L630 448 L594 514 Z" fill="#f3fdff"/>
+<path d="M630 448 L693 503 L594 514 Z" fill="#7299c4"/>
+<path d="M594 514 L693 503 L609 567 Z" fill="#5679ad"/>
+<path d="M515 462 L594 514 L547 526 Z" fill="#a9d1ec"/>
+<path d="M515 462 L609 567" stroke="#fff" stroke-opacity=".44" fill="none"/>
+<!-- long neck, folded head and beak -->
+<path d="M635 473 L711 342 L775 291 L747 346 L685 483 Z" fill="url(#facet)" stroke="#ddf8ff" stroke-width="2"/>
+<path d="M711 342 L775 291 L739 348 Z" fill="#f2ffff"/>
+<path d="M775 291 L818 307 L755 319 Z" fill="#c6eaff" stroke="#fff" stroke-width="1.5"/>
+<path d="M775 291 L755 319 L747 346 Z" fill="#466a9e"/>
+<!-- sharply folded tail -->
+<path d="M542 488 L429 402 L358 350 L460 457 L553 531 Z" fill="url(#wing)" stroke="#dffaff" stroke-width="2"/>
+<path d="M358 350 L487 473 L460 457 Z" fill="#fff" opacity=".7"/>
+<!-- lower wing panels -->
+<path d="M575 491 L391 582 L503 519 Z" fill="#aacfea" stroke="#f4ffff" stroke-width="1.2"/>
+<path d="M628 488 L789 567 L685 502 Z" fill="#93b8df" stroke="#f4ffff" stroke-width="1.2"/>
+<path d="M515 462 L635 473 M594 514 L630 448" stroke="#fff" stroke-opacity=".42" stroke-width="1.8"/>
+</g>
+<!-- internal glass refraction / rim light -->
+<path d="M352 252 Q405 174 519 148" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="19" stroke-linecap="round" filter="url(#blur)"/>
+<path d="M353 251 Q416 167 520 148" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="4" stroke-linecap="round"/>
+<path d="M810 243 Q897 340 882 458" stroke="#dbfcff" stroke-opacity=".23" stroke-width="11" fill="none" filter="url(#blur)"/>
+<path d="M376 614 Q509 754 700 708" stroke="#e8ffff" stroke-opacity=".33" stroke-width="7" fill="none"/>
+<ellipse cx="470" cy="238" rx="178" ry="95" fill="url(#highlight)" opacity=".27" transform="rotate(-37 470 238)"/>
+<path d="M303 491 Q310 621 409 686" fill="none" stroke="#c9f8ff" stroke-opacity=".38" stroke-width="9"/>
+</g>
+<circle cx="600" cy="440" r="307" fill="none" stroke="url(#rim)" stroke-width="8"/>
+<circle cx="600" cy="440" r="297" fill="none" stroke="#d2ffff" stroke-width="1.6" stroke-opacity=".25"/>
+<ellipse cx="600" cy="440" rx="306" ry="304" fill="none" stroke="#6ecfff" stroke-opacity=".13" stroke-width="3"/>
+<circle cx="406" cy="230" r="60" fill="url(#highlight)"/><circle cx="832" cy="650" r="32" fill="url(#highlight)"/>
+<text x="600" y="842" font-family="Georgia,serif" font-size="26" letter-spacing="7" fill="#d6f5ff" text-anchor="middle">FOLDED LIGHT</text>
+<text x="600" y="865" font-family="sans-serif" font-size="10" letter-spacing="4" fill="#86adcd" text-anchor="middle">GLASS · PAPER · REFRACTION</text>
+</svg></div><div class="tag">ART STUDY / 001<br><span>Crystalline origami</span></div><script type="module">
+
+</script></body></html>

@@ -1,0 +1,2961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>PRISM LAB — Interactive 3D Optics Physics Puzzle</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #040811;
+      font-family: 'Inter', sans-serif;
+      color: #e2e8f0;
+    }
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      touch-action: none;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .font-display {
+      font-family: 'Orbitron', sans-serif;
+    }
+    .font-mono-tech {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .glass-panel {
+      background: rgba(8, 16, 30, 0.78);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(56, 189, 248, 0.24);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+    .glass-panel-amber {
+      background: rgba(14, 18, 32, 0.84);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(251, 191, 36, 0.35);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(251, 191, 36, 0.12);
+    }
+    .btn-sci {
+      transition: all 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      background: linear-gradient(180deg, rgba(15, 31, 56, 0.85) 0%, rgba(9, 20, 38, 0.92) 100%);
+    }
+    .btn-sci:hover:not(:disabled) {
+      border-color: rgba(56, 189, 248, 0.85);
+      background: linear-gradient(180deg, rgba(24, 52, 92, 0.92) 0%, rgba(12, 28, 54, 0.96) 100%);
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.3);
+      transform: translateY(-1px);
+    }
+    .btn-sci:active:not(:disabled) {
+      transform: translateY(0px) scale(0.98);
+    }
+    .btn-sci:disabled {
+      opacity: 0.42;
+      cursor: not-allowed;
+    }
+    .btn-active {
+      border-color: #38bdf8 !important;
+      background: linear-gradient(180deg, rgba(14, 116, 144, 0.55) 0%, rgba(8, 51, 68, 0.85) 100%) !important;
+      box-shadow: 0 0 18px rgba(56, 189, 248, 0.4) !important;
+    }
+    /* Custom subtle scrollbars for side panels on smaller screens */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(6, 12, 24, 0.5);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(56, 189, 248, 0.35);
+      border-radius: 999px;
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: rgba(30, 41, 59, 0.9);
+      height: 6px;
+      border-radius: 999px;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #38bdf8;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+      border: 2px solid #e0f2fe;
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.85; }
+      50% { opacity: 1; box-shadow: 0 0 24px rgba(52, 211, 153, 0.55); }
+    }
+    .solved-banner-anim {
+      animation: pulseGlow 2s infinite ease-in-out;
+    }
+    .hud-pointer-none {
+      pointer-events: none;
+    }
+    .hud-pointer-auto {
+      pointer-events: auto;
+    }
+  </style>
+</head>
+<body>
+  <!-- 3D WebGL Viewport -->
+  <div id="canvas-container"></div>
+
+  <!-- Top Telemetry & Mode Bar -->
+  <header class="fixed top-0 left-0 right-0 z-20 p-2 sm:p-3 hud-pointer-none flex flex-wrap items-center justify-between gap-2">
+    <!-- Brand & Mode Switcher -->
+    <div class="glass-panel rounded-xl px-3 py-2 flex items-center gap-3 hud-pointer-auto">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 via-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+          <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <polygon points="12 3 21 19 3 19" />
+            <line x1="2" y1="13" x2="9.5" y2="13" stroke="#fde047" />
+            <line x1="14.5" y1="13" x2="22" y2="10" stroke="#38bdf8" />
+            <line x1="14.5" y1="13" x2="22" y2="16" stroke="#f43f5e" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="font-display text-sm sm:text-base font-bold tracking-wider text-white leading-none">PRISM LAB</h1>
+          <p class="text-[10px] font-mono-tech text-cyan-400/90 tracking-widest uppercase mt-0.5">Optical Physics Engine</p>
+        </div>
+      </div>
+
+      <div class="h-6 w-px bg-slate-700/80 hidden sm:block"></div>
+
+      <!-- Campaign / Sandbox Toggle -->
+      <div class="flex items-center bg-slate-950/75 p-1 rounded-lg border border-slate-800">
+        <button id="btn-mode-campaign" class="px-2.5 py-1 rounded-md text-xs font-semibold tracking-wide transition btn-active text-white">
+          CAMPAIGN
+        </button>
+        <button id="btn-mode-sandbox" class="px-2.5 py-1 rounded-md text-xs font-semibold tracking-wide transition text-slate-300 hover:text-white">
+          SANDBOX
+        </button>
+      </div>
+    </div>
+
+    <!-- Center Puzzle / Simulation Telemetry -->
+    <div class="glass-panel rounded-xl px-3 py-2 flex items-center gap-3 sm:gap-5 hud-pointer-auto">
+      <!-- Level Selector (Campaign Mode) -->
+      <div id="campaign-nav" class="flex items-center gap-1.5">
+        <button id="btn-prev-level" class="btn-sci rounded-lg p-1.5 text-cyan-300" title="Previous Level">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+        <div class="px-1.5 text-center min-w-[125px] sm:min-w-[165px]">
+          <div class="text-[10px] font-mono-tech text-cyan-400 uppercase tracking-wider" id="hud-level-tag">LEVEL 01 / 08</div>
+          <div class="text-xs sm:text-sm font-bold text-white truncate max-w-[165px]" id="hud-level-title">Incident Angle</div>
+        </div>
+        <button id="btn-next-level" class="btn-sci rounded-lg p-1.5 text-cyan-300" title="Next Level">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <div class="h-6 w-px bg-slate-700/80 hidden md:block"></div>
+
+      <!-- Live Telemetry Metrics -->
+      <div class="hidden md:flex items-center gap-4 text-xs font-mono-tech">
+        <div>
+          <span class="text-slate-400 block text-[10px]">LASERS</span>
+          <span id="hud-active-lasers" class="text-cyan-300 font-bold">1 ACTIVE</span>
+        </div>
+        <div>
+          <span class="text-slate-400 block text-[10px]">RECEIVERS</span>
+          <span id="hud-receivers" class="text-amber-300 font-bold">0 / 1</span>
+        </div>
+        <div>
+          <span class="text-slate-400 block text-[10px]">MOVES</span>
+          <span id="hud-moves" class="text-slate-200 font-bold">0 (PAR 2)</span>
+        </div>
+        <div>
+          <span class="text-slate-400 block text-[10px]">STATUS</span>
+          <span id="hud-status" class="text-sky-400 font-bold">ALIGNING</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Action Controls -->
+    <div class="glass-panel rounded-xl px-2.5 py-2 flex items-center gap-1.5 sm:gap-2 hud-pointer-auto">
+      <button id="btn-toggle-laser" class="btn-sci rounded-lg px-2.5 py-1.5 text-xs font-semibold text-emerald-300 flex items-center gap-1.5" title="Toggle Laser Power (Space)">
+        <span id="laser-power-dot" class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
+        <span id="laser-power-label" class="hidden sm:inline">BEAM ON</span>
+      </button>
+      <button id="btn-reset" class="btn-sci rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-200 flex items-center gap-1" title="Reset Puzzle (R)">
+        <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        <span class="hidden sm:inline">RESET</span>
+      </button>
+      <button id="btn-grid-snap" class="btn-sci rounded-lg px-2.5 py-1.5 text-xs font-semibold text-cyan-300 btn-active" title="Toggle Precision Grid Snap (G)">
+        <span class="font-mono-tech">SNAP: ON</span>
+      </button>
+      <button id="btn-audio" class="btn-sci rounded-lg p-1.5 text-cyan-300" title="Toggle Sound Effects">
+        <svg id="icon-audio-on" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+        <svg id="icon-audio-off" class="w-4 h-4 hidden text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Left Panel: Mission Briefing / Receiver Telemetry / Sandbox Fabricator -->
+  <aside class="fixed top-20 left-3 z-20 w-72 max-w-[calc(100vw-1.5rem)] flex flex-col gap-2.5 hud-pointer-none max-h-[calc(100vh-11rem)] overflow-y-auto pr-0.5">
+    <!-- Campaign Briefing Card -->
+    <div id="panel-mission" class="glass-panel rounded-xl p-3.5 hud-pointer-auto">
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="text-[10px] font-mono-tech uppercase tracking-widest text-cyan-400">Experiment Directive</span>
+        <span id="mission-badge" class="text-[10px] font-mono-tech px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">ACTIVE</span>
+      </div>
+      <p id="mission-desc" class="text-xs text-slate-300 leading-relaxed mb-2.5">
+        Redirect the cyan laser beam into the energy receiver using the front-surface mirror.
+      </p>
+      <div class="bg-slate-950/65 rounded-lg p-2 border border-slate-800/90 flex items-center justify-between text-[11px] font-mono-tech">
+        <span class="text-slate-400">OPTICAL PRINCIPLE:</span>
+        <span id="mission-principle" class="text-amber-300 font-semibold">θᵢ = θᵣ Reflection</span>
+      </div>
+    </div>
+
+    <!-- Sandbox Fabricator Card (Hidden in Campaign Mode) -->
+    <div id="panel-sandbox" class="glass-panel rounded-xl p-3.5 hud-pointer-auto hidden">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[10px] font-mono-tech uppercase tracking-widest text-amber-400">Optical Fabricator</span>
+        <button id="btn-sandbox-clear" class="text-[10px] font-mono-tech text-rose-400 hover:text-rose-300 underline">CLEAR LAB</button>
+      </div>
+      <div class="grid grid-cols-2 gap-1.5 mb-2.5">
+        <button data-spawn="mirror" class="btn-sci rounded-lg p-2 text-left flex items-center gap-2 text-xs">
+          <span class="w-2.5 h-2.5 rounded-sm bg-sky-300 shadow-[0_0_6px_#7dd3fc]"></span>
+          <span>Mirror</span>
+        </button>
+        <button data-spawn="prism" class="btn-sci rounded-lg p-2 text-left flex items-center gap-2 text-xs">
+          <span class="w-2.5 h-2.5 rotate-45 bg-indigo-400 shadow-[0_0_6px_#818cf8]"></span>
+          <span>Glass Prism</span>
+        </button>
+        <button data-spawn="lens" class="btn-sci rounded-lg p-2 text-left flex items-center gap-2 text-xs">
+          <span class="w-2.5 h-2.5 rounded-full bg-teal-300 shadow-[0_0_6px_#5eead4]"></span>
+          <span>Convex Lens</span>
+        </button>
+        <button data-spawn="splitter" class="btn-sci rounded-lg p-2 text-left flex items-center gap-2 text-xs">
+          <span class="w-2.5 h-2.5 rounded-sm border border-cyan-300 bg-cyan-500/30"></span>
+          <span>Beam Splitter</span>
+        </button>
+        <button data-spawn="filter" class="btn-sci rounded-lg p-2 text-left flex items-center gap-2 text-xs">
+          <span class="w-2.5 h-2.5 rounded-sm bg-rose-400 shadow-[0_0_6px_#fb7185]"></span>
+          <span>Color Filter</span>
+        </button>
+        <button data-spawn="emitter" class="btn-sci rounded-lg p-2 text-left flex items-center gap-2 text-xs">
+          <span class="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_6px_#fbbf24]"></span>
+          <span>Laser Emitter</span>
+        </button>
+        <button data-spawn="receiver" class="btn-sci rounded-lg p-2 text-left flex items-center gap-2 text-xs">
+          <span class="w-2.5 h-2.5 rounded-full border-2 border-emerald-400"></span>
+          <span>Receiver</span>
+        </button>
+        <button data-spawn="wall" class="btn-sci rounded-lg p-2 text-left flex items-center gap-2 text-xs">
+          <span class="w-2.5 h-2.5 rounded-sm bg-slate-500"></span>
+          <span>Blocker Wall</span>
+        </button>
+      </div>
+
+      <!-- Sandbox Preset Experiments -->
+      <div class="border-t border-slate-800 pt-2">
+        <span class="text-[10px] font-mono-tech text-slate-400 uppercase block mb-1.5">Lab Presets</span>
+        <div class="grid grid-cols-2 gap-1.5">
+          <button data-preset="tir" class="btn-sci rounded-md py-1 px-2 text-[11px] text-cyan-200 truncate">Total Internal Refl.</button>
+          <button data-preset="lens" class="btn-sci rounded-md py-1 px-2 text-[11px] text-cyan-200 truncate">Focal Convergence</button>
+          <button data-preset="rgb" class="btn-sci rounded-md py-1 px-2 text-[11px] text-cyan-200 truncate">RGB Color Mixer</button>
+          <button data-preset="cavity" class="btn-sci rounded-md py-1 px-2 text-[11px] text-cyan-200 truncate">Resonator Cavity</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Target Receivers Live Status -->
+    <div class="glass-panel rounded-xl p-3.5 hud-pointer-auto">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[10px] font-mono-tech uppercase tracking-widest text-cyan-400">Target Receivers</span>
+        <span id="receiver-summary-chip" class="text-[10px] font-mono-tech text-slate-300">0 / 1 CHARGED</span>
+      </div>
+      <div id="receiver-list" class="flex flex-col gap-2">
+        <!-- Populated dynamically -->
+      </div>
+    </div>
+  </aside>
+
+  <!-- Right Panel: Selected Optical Device Inspector -->
+  <aside id="panel-inspector" class="fixed top-20 right-3 z-20 w-72 max-w-[calc(100vw-1.5rem)] glass-panel rounded-xl p-3.5 hud-pointer-auto transition-all duration-200">
+    <div class="flex items-center justify-between mb-2">
+      <span class="text-[10px] font-mono-tech uppercase tracking-widest text-cyan-400">Optical Inspector</span>
+      <span id="inspector-lock-badge" class="text-[10px] font-mono-tech px-2 py-0.5 rounded bg-slate-800 text-slate-300">NO SELECTION</span>
+    </div>
+
+    <!-- Empty Selection Hint -->
+    <div id="inspector-empty" class="py-3 text-center">
+      <p class="text-xs text-slate-400 mb-2">Click any mirror, prism, lens, filter, or emitter on the optical bench to inspect &amp; align.</p>
+      <div class="text-[10px] font-mono-tech text-slate-500 space-y-1 text-left bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
+        <div>• <span class="text-cyan-300">Left Click</span>: Select optical device</div>
+        <div>• <span class="text-cyan-300">Drag Device</span>: Reposition on grid</div>
+        <div>• <span class="text-cyan-300">Q / E</span>: Rotate orientation</div>
+        <div>• <span class="text-cyan-300">Drag Space / Scroll</span>: Orbit &amp; Zoom</div>
+      </div>
+    </div>
+
+    <!-- Active Selection Controls -->
+    <div id="inspector-content" class="hidden space-y-3">
+      <div>
+        <div class="text-sm font-bold text-white" id="insp-name">Front-Surface Mirror</div>
+        <div class="text-[11px] font-mono-tech text-slate-400" id="insp-physics">Specular Reflector (R = 97%)</div>
+      </div>
+
+      <!-- Coordinates & Angle Readout -->
+      <div class="grid grid-cols-3 gap-1.5 bg-slate-950/70 p-2 rounded-lg border border-slate-800 font-mono-tech text-[11px]">
+        <div>
+          <span class="text-slate-500 block text-[9px]">POS X</span>
+          <span id="insp-x" class="text-cyan-300 font-semibold">0.00</span>
+        </div>
+        <div>
+          <span class="text-slate-500 block text-[9px]">POS Z</span>
+          <span id="insp-z" class="text-cyan-300 font-semibold">0.00</span>
+        </div>
+        <div>
+          <span class="text-slate-500 block text-[9px]">ANGLE</span>
+          <span id="insp-angle" class="text-amber-300 font-semibold">45.0°</span>
+        </div>
+      </div>
+
+      <!-- Rotation Control (if rotatable) -->
+      <div id="insp-rotate-group" class="space-y-1.5">
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="text-slate-300 font-medium">Orientation (Q / E)</span>
+          <span class="font-mono-tech text-cyan-400" id="insp-angle-label">45.0°</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button id="btn-rot-ccw" class="btn-sci rounded-lg px-2.5 py-1.5 text-xs font-mono-tech text-cyan-300 flex-1" title="Rotate Counter-Clockwise (Q)">↺ -5°</button>
+          <button id="btn-rot-fine-ccw" class="btn-sci rounded-lg px-2 py-1.5 text-xs font-mono-tech text-slate-300" title="Fine Rotate -0.5°">-0.5°</button>
+          <button id="btn-rot-fine-cw" class="btn-sci rounded-lg px-2 py-1.5 text-xs font-mono-tech text-slate-300" title="Fine Rotate +0.5°">+0.5°</button>
+          <button id="btn-rot-cw" class="btn-sci rounded-lg px-2.5 py-1.5 text-xs font-mono-tech text-cyan-300 flex-1" title="Rotate Clockwise (E)">↻ +5°</button>
+        </div>
+        <input id="slider-angle" type="range" min="0" max="360" step="0.5" value="0" class="w-full mt-1" />
+      </div>
+
+      <!-- Refractive Index Control (for Prisms & Lenses) -->
+      <div id="insp-ior-group" class="hidden space-y-1.5 border-t border-slate-800 pt-2.5">
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="text-slate-300 font-medium">Refractive Index (n)</span>
+          <span class="font-mono-tech text-indigo-300 font-bold" id="insp-ior-val">1.52</span>
+        </div>
+        <input id="slider-ior" type="range" min="1.10" max="2.40" step="0.01" value="1.52" class="w-full" />
+        <div class="flex justify-between text-[9px] font-mono-tech text-slate-500">
+          <span>Water 1.33</span>
+          <span>Crown 1.52</span>
+          <span>Diamond 2.40</span>
+        </div>
+      </div>
+
+      <!-- Color Swatch Control (for Emitters, Filters, Receivers in Sandbox or unlocked) -->
+      <div id="insp-color-group" class="hidden space-y-1.5 border-t border-slate-800 pt-2.5">
+        <span class="text-[11px] text-slate-300 font-medium block" id="insp-color-title">Spectral Wavelength</span>
+        <div class="grid grid-cols-7 gap-1" id="insp-color-swatches">
+          <button data-rgb="1,0,0" class="h-6 rounded border border-white/20 bg-red-500 hover:scale-105 transition" title="Red (650nm)"></button>
+          <button data-rgb="0,1,0" class="h-6 rounded border border-white/20 bg-emerald-500 hover:scale-105 transition" title="Green (532nm)"></button>
+          <button data-rgb="0,0,1" class="h-6 rounded border border-white/20 bg-blue-500 hover:scale-105 transition" title="Blue (450nm)"></button>
+          <button data-rgb="0,1,1" class="h-6 rounded border border-white/20 bg-cyan-400 hover:scale-105 transition" title="Cyan"></button>
+          <button data-rgb="1,1,0" class="h-6 rounded border border-white/20 bg-yellow-400 hover:scale-105 transition" title="Yellow"></button>
+          <button data-rgb="1,0,1" class="h-6 rounded border border-white/20 bg-fuchsia-500 hover:scale-105 transition" title="Magenta"></button>
+          <button data-rgb="1,1,1" class="h-6 rounded border border-white/20 bg-white hover:scale-105 transition" title="Broadband White"></button>
+        </div>
+      </div>
+
+      <!-- Laser Intensity Control (for Emitters in Sandbox) -->
+      <div id="insp-intensity-group" class="hidden space-y-1.5 border-t border-slate-800 pt-2.5">
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="text-slate-300 font-medium">Beam Output Power</span>
+          <span class="font-mono-tech text-amber-300 font-bold" id="insp-intensity-val">100%</span>
+        </div>
+        <input id="slider-intensity" type="range" min="0.25" max="2.0" step="0.05" value="1.0" class="w-full" />
+      </div>
+
+      <!-- Sandbox Delete Object Button -->
+      <div id="insp-sandbox-actions" class="hidden pt-2 border-t border-slate-800 flex gap-2">
+        <button id="btn-delete-obj" class="w-full py-1.5 px-3 rounded-lg bg-rose-950/80 hover:bg-rose-900/90 border border-rose-500/40 text-rose-200 text-xs font-semibold transition">
+          REMOVE DEVICE
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Puzzle Solved Celebration Overlay Banner -->
+  <div id="solved-modal" class="fixed inset-x-0 bottom-16 z-30 flex justify-center px-4 hud-pointer-none hidden">
+    <div class="glass-panel-amber solved-banner-anim rounded-2xl p-4 sm:p-5 max-w-md w-full hud-pointer-auto text-center">
+      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[11px] font-mono-tech tracking-widest uppercase mb-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+        OPTICAL CIRCUIT SYNCHRONIZED
+      </div>
+      <h2 class="font-display text-lg sm:text-xl font-bold text-white mb-1" id="solved-title">LEVEL 01 COMPLETE</h2>
+      <p class="text-xs text-slate-300 mb-3" id="solved-stats">All energy receivers charged at optimal coherence. Moves: 2 / Par: 2</p>
+      <div class="flex items-center justify-center gap-2.5">
+        <button id="btn-replay-level" class="btn-sci rounded-xl px-4 py-2 text-xs font-semibold text-slate-200">
+          REPLAY
+        </button>
+        <button id="btn-next-campaign" class="rounded-xl px-5 py-2 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 via-sky-400 to-emerald-400 hover:brightness-110 shadow-lg shadow-cyan-500/30 transition">
+          NEXT EXPERIMENT →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Compact Control Bar (Touch & Shortcut Helper) -->
+  <footer class="fixed bottom-2.5 left-1/2 -translate-x-1/2 z-20 glass-panel rounded-full px-3.5 py-1.5 flex items-center gap-3 text-[11px] font-mono-tech text-slate-300 hud-pointer-auto max-w-[96vw] overflow-x-auto whitespace-nowrap">
+    <span class="hidden sm:inline"><strong class="text-cyan-400">DRAG</strong> Move / Orbit</span>
+    <span class="hidden sm:inline text-slate-600">|</span>
+    <span><strong class="text-cyan-400">Q / E</strong> Rotate</span>
+    <span class="text-slate-600">|</span>
+    <span><strong class="text-cyan-400">SPACE</strong> Beam</span>
+    <span class="text-slate-600">|</span>
+    <span><strong class="text-cyan-400">R</strong> Reset</span>
+    <span class="text-slate-600">|</span>
+    <button id="btn-cam-top" class="text-amber-300 hover:text-amber-200 underline">TOP VIEW</button>
+    <button id="btn-cam-iso" class="text-cyan-300 hover:text-cyan-200 underline">3D VIEW</button>
+  </footer>
+
+  <script>
+    /**
+     * ============================================================================
+     * PRISM LAB — COMPLETE 3D OPTICS PHYSICS PUZZLE ENGINE
+     * ============================================================================
+     * Architecture:
+     * 1. SoundFX: Procedural Web Audio API synthesizer for UI, alignment, laser & solve cues.
+     * 2. OpticsEngine: Analytical geometric ray-tracing engine supporting:
+     *    - Vector Law of Reflection: R = I - 2(I · N)N
+     *    - Snell's Law Refraction: n1 * sin(theta1) = n2 * sin(theta2)
+     *    - Total Internal Reflection (TIR)
+     *    - Curved Biconvex Lens Refraction (two circular arc interfaces via Snell's Law)
+     *    - Intensity-Conserving 50/50 Beam Splitting
+     *    - RGB Spectral Color Filtering & Additive Receiver Mixing
+     * 3. LabRenderer: Three.js 3D environment with reflective metallic chamber,
+     *    PMREM environment reflections, physical glass prisms/lenses, multi-layer
+     *    volumetric laser beams, animated photon packets, sparks, and camera controls.
+     * 4. CampaignLevels: 8 progressively challenging, verified solvable optical puzzles.
+     * 5. SandboxManager: Freeform laboratory builder with real-time property tuning.
+     */
+
+    // ---------------------------------------------------------------------------
+    // 1. PROCEDURAL WEB AUDIO SYNTHESIZER
+    // ---------------------------------------------------------------------------
+    class SoundFX {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+        this.lastTickTime = 0;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) {
+            this.ctx = new AudioCtx();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume().catch(() => {});
+        }
+      }
+
+      toggle() {
+        this.enabled = !this.enabled;
+        return this.enabled;
+      }
+
+      playSelect() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.095);
+      }
+
+      playServoTick() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        if (now - this.lastTickTime < 0.045) return;
+        this.lastTickTime = now;
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(240, now);
+        osc.frequency.exponentialRampToValueAtTime(160, now + 0.03);
+        gain.gain.setValueAtTime(0.035, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.04);
+      }
+
+      playLaserToggle(isOn) {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        if (isOn) {
+          osc.frequency.setValueAtTime(140, now);
+          osc.frequency.exponentialRampToValueAtTime(640, now + 0.22);
+        } else {
+          osc.frequency.setValueAtTime(520, now);
+          osc.frequency.exponentialRampToValueAtTime(110, now + 0.18);
+        }
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.25);
+      }
+
+      playReceiverLock() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        [660, 990].forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+          gain.gain.setValueAtTime(0.07, now + idx * 0.06);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.25);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.06);
+          osc.stop(now + idx * 0.06 + 0.26);
+        });
+      }
+
+      playLevelSolved() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5 E5 G5 C6
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          const t = now + idx * 0.08;
+          osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.09, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.56);
+        });
+      }
+    }
+
+    const sfx = new SoundFX();
+
+    // ---------------------------------------------------------------------------
+    // 2. ANALYTICAL RAY-OPTICS PHYSICS ENGINE
+    // ---------------------------------------------------------------------------
+    const EPSILON = 1e-4;
+    const MAX_RAY_DEPTH = 28;
+    const MIN_RAY_INTENSITY = 0.04;
+    const MAX_RAY_SEGMENTS = 180;
+    const BEAM_Y = 0.75; // Optical bench beam plane height
+    const LAB_BOUNDS = { minX: -10.5, maxX: 10.5, minZ: -6.8, maxZ: 6.8 };
+
+    function rgbToHex(rgb) {
+      if (!rgb) return 0xffffff;
+      const r = Math.min(255, Math.max(0, Math.round((rgb.r ?? 0) * 255)));
+      const g = Math.min(255, Math.max(0, Math.round((rgb.g ?? 0) * 255)));
+      const b = Math.min(255, Math.max(0, Math.round((rgb.b ?? 0) * 255)));
+      return (r << 16) | (g << 8) | b;
+    }
+
+    function rgbToCss(rgb) {
+      if (!rgb) return 'rgb(255, 255, 255)';
+      const r = Math.min(255, Math.max(0, Math.round((rgb.r ?? 0) * 255)));
+      const g = Math.min(255, Math.max(0, Math.round((rgb.g ?? 0) * 255)));
+      const b = Math.min(255, Math.max(0, Math.round((rgb.b ?? 0) * 255)));
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    function getColorLabel(rgb) {
+      if (!rgb) return 'UNKNOWN';
+      const r = (rgb.r ?? 0) > 0.5 ? 1 : 0;
+      const g = (rgb.g ?? 0) > 0.5 ? 1 : 0;
+      const b = (rgb.b ?? 0) > 0.5 ? 1 : 0;
+      const key = `${r}${g}${b}`;
+      const map = {
+        '100': 'RED',
+        '010': 'GREEN',
+        '001': 'BLUE',
+        '011': 'CYAN',
+        '110': 'YELLOW',
+        '101': 'MAGENTA',
+        '111': 'WHITE',
+        '000': 'DARK'
+      };
+      return map[key] || 'CUSTOM';
+    }
+
+    class OpticsEngine {
+      constructor() {
+        this.segments = [];
+        this.hitPoints = [];
+      }
+
+      /**
+       * Intersect 2D ray O + t*D (t > EPSILON) with line segment A -> B
+       * Returns { t, point: {x, z}, normal: {x, z} } or null
+       */
+      intersectSegment(ox, oz, dx, dz, ax, az, bx, bz) {
+        const vx = bx - ax;
+        const vz = bz - az;
+        const denom = dx * vz - dz * vx;
+        if (Math.abs(denom) < 1e-9) return null;
+
+        const qpx = ax - ox;
+        const qpz = az - oz;
+        const t = (qpx * vz - qpz * vx) / denom;
+        const u = (qpx * dz - qpz * dx) / denom;
+
+        if (t > EPSILON && u >= -1e-6 && u <= 1 + 1e-6) {
+          // Outward right-hand normal of segment A -> B
+          const len = Math.hypot(vx, vz) || 1;
+          const nx = vz / len;
+          const nz = -vx / len;
+          return {
+            t,
+            point: { x: ox + t * dx, z: oz + t * dz },
+            normal: { x: nx, z: nz }
+          };
+        }
+        return null;
+      }
+
+      /**
+       * Intersect 2D ray O + t*D with circle center (cx, cz) and radius r
+       */
+      intersectCircle(ox, oz, dx, dz, cx, cz, r) {
+        const fx = ox - cx;
+        const fz = oz - cz;
+        const b = 2 * (fx * dx + fz * dz);
+        const c = fx * fx + fz * fz - r * r;
+        const disc = b * b - 4 * c;
+        if (disc < 0) return null;
+
+        const sqrtDisc = Math.sqrt(disc);
+        const t1 = (-b - sqrtDisc) / 2;
+        const t2 = (-b + sqrtDisc) / 2;
+
+        let t = null;
+        if (t1 > EPSILON) t = t1;
+        else if (t2 > EPSILON) t = t2;
+
+        if (t === null) return null;
+        const px = ox + t * dx;
+        const pz = oz + t * dz;
+        const nx = (px - cx) / r;
+        const nz = (pz - cz) / r;
+        return {
+          t,
+          point: { x: px, z: pz },
+          normal: { x: nx, z: nz }
+        };
+      }
+
+      /**
+       * Intersect 2D ray with a circular arc defined by center (cx, cz), radius R,
+       * and chord endpoints or angular aperture around a reference normal direction.
+       * Used for true biconvex spherical lens surfaces!
+       */
+      intersectLensArc(ox, oz, dx, dz, cx, cz, R, axisDirX, axisDirZ, halfChord) {
+        const fx = ox - cx;
+        const fz = oz - cz;
+        const b = 2 * (fx * dx + fz * dz);
+        const c = fx * fx + fz * fz - R * R;
+        const disc = b * b - 4 * c;
+        if (disc < 0) return null;
+
+        const sqrtDisc = Math.sqrt(disc);
+        const candidates = [(-b - sqrtDisc) / 2, (-b + sqrtDisc) / 2];
+        let best = null;
+
+        // Tangent perpendicular to axisDir
+        const tanX = -axisDirZ;
+        const tanZ = axisDirX;
+
+        for (const t of candidates) {
+          if (t <= EPSILON) continue;
+          const px = ox + t * dx;
+          const pz = oz + t * dz;
+          const relX = px - cx;
+          const relZ = pz - cz;
+          // Must lie on the hemisphere facing axisDir
+          const alongAxis = relX * axisDirX + relZ * axisDirZ;
+          if (alongAxis <= 0) continue;
+          // Lateral distance from optical axis must be within lens aperture halfChord
+          const lateral = Math.abs(relX * tanX + relZ * tanZ);
+          if (lateral <= halfChord) {
+            if (!best || t < best.t) {
+              best = {
+                t,
+                point: { x: px, z: pz },
+                // Outward normal of this convex lens surface points away from center of curvature
+                normal: { x: relX / R, z: relZ / R }
+              };
+            }
+          }
+        }
+        return best;
+      }
+
+      /**
+       * Build geometric surfaces for an optical device in world XZ coordinates
+       */
+      getObjectSurfaces(obj) {
+        const cos = Math.cos(obj.angle);
+        const sin = Math.sin(obj.angle);
+        const toWorld = (lx, lz) => ({
+          x: obj.x + lx * cos - lz * sin,
+          z: obj.z + lx * sin + lz * cos
+        });
+
+        if (obj.type === 'mirror') {
+          // Mirror lies along local Z axis [-halfW, +halfW], front normal points along local +X
+          const hw = 0.95;
+          const thick = 0.14;
+          const fA = toWorld(0, -hw);
+          const fB = toWorld(0, hw);
+          const bA = toWorld(-thick, hw);
+          const bB = toWorld(-thick, -hw);
+          return [
+            { kind: 'mirror_front', a: fA, b: fB, obj },
+            { kind: 'blocker', a: bA, b: bB, obj },
+            { kind: 'blocker', a: fB, b: bA, obj },
+            { kind: 'blocker', a: bB, b: fA, obj }
+          ];
+        }
+
+        if (obj.type === 'prism') {
+          // Equilateral triangular glass prism centered at (0,0) with circumradius R = 1.05
+          const R = 1.05;
+          const v0 = toWorld(R, 0);
+          const v1 = toWorld(R * Math.cos((2 * Math.PI) / 3), R * Math.sin((2 * Math.PI) / 3));
+          const v2 = toWorld(R * Math.cos((4 * Math.PI) / 3), R * Math.sin((4 * Math.PI) / 3));
+          // Counter-clockwise winding in XZ so right-hand normal (vz, -vx) points OUTWARD!
+          // Let's verify: v0=(1,0), v1=(-0.5, 0.866). vx=-1.5, vz=0.866 -> (vz, -vx)=(0.866, 1.5) -> OUTWARD!
+          return [
+            { kind: 'refractive', a: v0, b: v1, obj },
+            { kind: 'refractive', a: v1, b: v2, obj },
+            { kind: 'refractive', a: v2, b: v0, obj }
+          ];
+        }
+
+        if (obj.type === 'splitter') {
+          // Semi-silvered beam splitter plate along local Z [-0.9, +0.9]
+          const hw = 0.9;
+          const a = toWorld(0, -hw);
+          const b = toWorld(0, hw);
+          return [{ kind: 'splitter', a, b, obj }];
+        }
+
+        if (obj.type === 'filter') {
+          // Dichroic optical color filter plate along local Z [-0.9, +0.9]
+          const hw = 0.9;
+          const a = toWorld(0, -hw);
+          const b = toWorld(0, hw);
+          return [{ kind: 'filter', a, b, obj }];
+        }
+
+        if (obj.type === 'wall') {
+          // Rectangular titanium bulkhead obstacle
+          const hx = (obj.width || 2.2) * 0.5;
+          const hz = (obj.depth || 0.45) * 0.5;
+          const p0 = toWorld(-hx, -hz);
+          const p1 = toWorld(hx, -hz);
+          const p2 = toWorld(hx, hz);
+          const p3 = toWorld(-hx, hz);
+          return [
+            { kind: 'blocker', a: p0, b: p1, obj },
+            { kind: 'blocker', a: p1, b: p2, obj },
+            { kind: 'blocker', a: p2, b: p3, obj },
+            { kind: 'blocker', a: p3, b: p0, obj }
+          ];
+        }
+
+        if (obj.type === 'emitter') {
+          // Emitter housing acts as opaque body except front aperture
+          const hx = 0.55;
+          const hz = 0.45;
+          const p0 = toWorld(-hx, -hz);
+          const p1 = toWorld(hx, -hz);
+          const p2 = toWorld(hx, hz);
+          const p3 = toWorld(-hx, hz);
+          return [
+            { kind: 'blocker', a: p0, b: p1, obj },
+            { kind: 'blocker', a: p2, b: p3, obj },
+            { kind: 'blocker', a: p3, b: p0, obj }
+          ];
+        }
+
+        return [];
+      }
+
+      /**
+       * Vector reflection: R = I - 2(I · N)N
+       */
+      reflectVector(ix, iz, nx, nz) {
+        const dot = ix * nx + iz * nz;
+        const rx = ix - 2 * dot * nx;
+        const rz = iz - 2 * dot * nz;
+        const len = Math.hypot(rx, rz) || 1;
+        return { x: rx / len, z: rz / len };
+      }
+
+      /**
+       * Snell's Law Refraction: n1 * sin(theta1) = n2 * sin(theta2)
+       * Returns { refracted: {x, z} | null, tir: boolean }
+       */
+      refractVector(ix, iz, outwardNx, outwardNz, mediumIOR) {
+        const dotIN = ix * outwardNx + iz * outwardNz;
+        let n1, n2, nx, nz;
+
+        if (dotIN < 0) {
+          // Entering medium from air (n1 = 1.0 -> n2 = mediumIOR)
+          n1 = 1.0;
+          n2 = mediumIOR;
+          nx = outwardNx;
+          nz = outwardNz;
+        } else {
+          // Exiting medium into air (n1 = mediumIOR -> n2 = 1.0)
+          n1 = mediumIOR;
+          n2 = 1.0;
+          nx = -outwardNx;
+          nz = -outwardNz;
+        }
+
+        const cosTheta1 = -(ix * nx + iz * nz);
+        const eta = n1 / n2;
+        const k = 1 - eta * eta * (1 - cosTheta1 * cosTheta1);
+
+        if (k < 0) {
+          // Total Internal Reflection!
+          const refl = this.reflectVector(ix, iz, nx, nz);
+          return { refracted: null, reflected: refl, tir: true };
+        }
+
+        const factor = eta * cosTheta1 - Math.sqrt(k);
+        const tx = eta * ix + factor * nx;
+        const tz = eta * iz + factor * nz;
+        const len = Math.hypot(tx, tz) || 1;
+        return {
+          refracted: { x: tx / len, z: tz / len },
+          reflected: null,
+          tir: false
+        };
+      }
+
+      /**
+       * Trace all active laser emitters through the scene objects
+       */
+      traceScene(objects, lasersActive) {
+        this.segments = [];
+        this.hitPoints = [];
+
+        // Reset receiver energy accumulators
+        for (const obj of objects) {
+          if (obj.type === 'receiver') {
+            obj.receivedColor = { r: 0, g: 0, b: 0 };
+            obj.receivedIntensity = 0;
+            obj.hitCount = 0;
+          }
+        }
+
+        if (!lasersActive) return;
+
+        // Precompute geometric surfaces for all objects
+        const allSurfaces = [];
+        const lenses = [];
+        const receivers = [];
+
+        for (const obj of objects) {
+          if (obj.type === 'lens') lenses.push(obj);
+          else if (obj.type === 'receiver') receivers.push(obj);
+          const surfs = this.getObjectSurfaces(obj);
+          allSurfaces.push(...surfs);
+        }
+
+        // Lab outer boundary walls
+        const b = LAB_BOUNDS;
+        const labWalls = [
+          { kind: 'wall_bound', a: { x: b.minX, z: b.minZ }, b: { x: b.maxX, z: b.minZ } },
+          { kind: 'wall_bound', a: { x: b.maxX, z: b.minZ }, b: { x: b.maxX, z: b.maxZ } },
+          { kind: 'wall_bound', a: { x: b.maxX, z: b.maxZ }, b: { x: b.minX, z: b.maxZ } },
+          { kind: 'wall_bound', a: { x: b.minX, z: b.maxZ }, b: { x: b.minX, z: b.minZ } }
+        ];
+
+        // Queue of rays to propagate (BFS/DFS queue)
+        const rayQueue = [];
+        for (const obj of objects) {
+          if (obj.type === 'emitter') {
+            const dx = Math.cos(obj.angle);
+            const dz = Math.sin(obj.angle);
+            const startX = obj.x + dx * 0.62;
+            const startZ = obj.z + dz * 0.62;
+            rayQueue.push({
+              ox: startX,
+              oz: startZ,
+              dx,
+              dz,
+              color: { ...obj.color },
+              intensity: obj.intensity ?? 1.0,
+              depth: 0
+            });
+          }
+        }
+
+        while (rayQueue.length > 0 && this.segments.length < MAX_RAY_SEGMENTS) {
+          const ray = rayQueue.shift();
+          if (ray.depth > MAX_RAY_DEPTH || ray.intensity < MIN_RAY_INTENSITY) continue;
+
+          let closest = null;
+
+          // 1. Check planar surfaces (mirrors, prisms, splitters, filters, blockers)
+          for (const surf of allSurfaces) {
+            const hit = this.intersectSegment(
+              ray.ox, ray.oz, ray.dx, ray.dz,
+              surf.a.x, surf.a.z, surf.b.x, surf.b.z
+            );
+            if (hit && (!closest || hit.t < closest.t)) {
+              closest = { ...hit, kind: surf.kind, obj: surf.obj };
+            }
+          }
+
+          // 2. Check biconvex lenses (two opposing spherical arcs)
+          for (const lens of lenses) {
+            const halfChord = 0.95;
+            const R = 1.65; // Radius of curvature
+            const sagitta = R - Math.sqrt(R * R - halfChord * halfChord); // ~0.30
+            const cos = Math.cos(lens.angle);
+            const sin = Math.sin(lens.angle);
+            // Front arc center is behind lens center by (R - sagitta), facing +localX
+            const c1x = lens.x - cos * (R - sagitta);
+            const c1z = lens.z - sin * (R - sagitta);
+            const h1 = this.intersectLensArc(ray.ox, ray.oz, ray.dx, ray.dz, c1x, c1z, R, cos, sin, halfChord);
+            if (h1 && (!closest || h1.t < closest.t)) {
+              closest = { ...h1, kind: 'refractive', obj: lens };
+            }
+            // Back arc center is ahead of lens center by (R - sagitta), facing -localX
+            const c2x = lens.x + cos * (R - sagitta);
+            const c2z = lens.z + sin * (R - sagitta);
+            const h2 = this.intersectLensArc(ray.ox, ray.oz, ray.dx, ray.dz, c2x, c2z, R, -cos, -sin, halfChord);
+            if (h2 && (!closest || h2.t < closest.t)) {
+              closest = { ...h2, kind: 'refractive', obj: lens };
+            }
+          }
+
+          // 3. Check energy receivers
+          for (const rec of receivers) {
+            const hit = this.intersectCircle(ray.ox, ray.oz, ray.dx, ray.dz, rec.x, rec.z, 0.54);
+            if (hit && (!closest || hit.t < closest.t)) {
+              closest = { ...hit, kind: 'receiver', obj: rec };
+            }
+          }
+
+          // 4. Check laboratory chamber walls
+          for (const w of labWalls) {
+            const hit = this.intersectSegment(
+              ray.ox, ray.oz, ray.dx, ray.dz,
+              w.a.x, w.a.z, w.b.x, w.b.z
+            );
+            if (hit && (!closest || hit.t < closest.t)) {
+              closest = { ...hit, kind: 'wall_bound', obj: null };
+            }
+          }
+
+          if (!closest) continue;
+
+          // Record visible beam segment
+          this.segments.push({
+            start: { x: ray.ox, y: BEAM_Y, z: ray.oz },
+            end: { x: closest.point.x, y: BEAM_Y, z: closest.point.z },
+            color: { ...ray.color },
+            intensity: ray.intensity
+          });
+
+          // Record impact spark / flare point
+          this.hitPoints.push({
+            x: closest.point.x,
+            y: BEAM_Y,
+            z: closest.point.z,
+            color: { ...ray.color },
+            intensity: ray.intensity,
+            kind: closest.kind
+          });
+
+          // Handle optical interaction at hit point
+          const hx = closest.point.x;
+          const hz = closest.point.z;
+
+          if (closest.kind === 'mirror_front') {
+            const dot = ray.dx * closest.normal.x + ray.dz * closest.normal.z;
+            if (dot < 0) {
+              const refl = this.reflectVector(ray.dx, ray.dz, closest.normal.x, closest.normal.z);
+              rayQueue.push({
+                ox: hx + refl.x * EPSILON * 2,
+                oz: hz + refl.z * EPSILON * 2,
+                dx: refl.x,
+                dz: refl.z,
+                color: { ...ray.color },
+                intensity: ray.intensity * 0.97,
+                depth: ray.depth + 1
+              });
+            }
+          } else if (closest.kind === 'refractive') {
+            const ior = closest.obj.ior || 1.52;
+            const res = this.refractVector(ray.dx, ray.dz, closest.normal.x, closest.normal.z, ior);
+            if (res.tir && res.reflected) {
+              rayQueue.push({
+                ox: hx + res.reflected.x * EPSILON * 2,
+                oz: hz + res.reflected.z * EPSILON * 2,
+                dx: res.reflected.x,
+                dz: res.reflected.z,
+                color: { ...ray.color },
+                intensity: ray.intensity * 0.96,
+                depth: ray.depth + 1
+              });
+            } else if (res.refracted) {
+              rayQueue.push({
+                ox: hx + res.refracted.x * EPSILON * 2,
+                oz: hz + res.refracted.z * EPSILON * 2,
+                dx: res.refracted.x,
+                dz: res.refracted.z,
+                color: { ...ray.color },
+                intensity: ray.intensity * 0.96,
+                depth: ray.depth + 1
+              });
+            }
+          } else if (closest.kind === 'splitter') {
+            // 50/50 Intensity-conserving split: 49% reflected + 49% transmitted
+            const dot = ray.dx * closest.normal.x + ray.dz * closest.normal.z;
+            const effNx = dot < 0 ? closest.normal.x : -closest.normal.x;
+            const effNz = dot < 0 ? closest.normal.z : -closest.normal.z;
+            const refl = this.reflectVector(ray.dx, ray.dz, effNx, effNz);
+            const halfInt = ray.intensity * 0.49;
+
+            // Reflected branch
+            rayQueue.push({
+              ox: hx + refl.x * EPSILON * 2,
+              oz: hz + refl.z * EPSILON * 2,
+              dx: refl.x,
+              dz: refl.z,
+              color: { ...ray.color },
+              intensity: halfInt,
+              depth: ray.depth + 1
+            });
+
+            // Transmitted branch
+            rayQueue.push({
+              ox: hx + ray.dx * EPSILON * 3,
+              oz: hz + ray.dz * EPSILON * 3,
+              dx: ray.dx,
+              dz: ray.dz,
+              color: { ...ray.color },
+              intensity: halfInt,
+              depth: ray.depth + 1
+            });
+          } else if (closest.kind === 'filter') {
+            // Spectral RGB transmission filter
+            const fc = closest.obj.filterColor || { r: 1, g: 0, b: 0 };
+            const outColor = {
+              r: ray.color.r * fc.r,
+              g: ray.color.g * fc.g,
+              b: ray.color.b * fc.b
+            };
+            const maxChannel = Math.max(outColor.r, outColor.g, outColor.b);
+            if (maxChannel > 0.1) {
+              // Normalize chromaticity while scaling intensity by transmitted spectral power
+              const normColor = {
+                r: outColor.r / maxChannel,
+                g: outColor.g / maxChannel,
+                b: outColor.b / maxChannel
+              };
+              rayQueue.push({
+                ox: hx + ray.dx * EPSILON * 3,
+                oz: hz + ray.dz * EPSILON * 3,
+                dx: ray.dx,
+                dz: ray.dz,
+                color: normColor,
+                intensity: ray.intensity * 0.94,
+                depth: ray.depth + 1
+              });
+            }
+          } else if (closest.kind === 'receiver') {
+            // Deposit photon energy into receiver
+            const rec = closest.obj;
+            rec.receivedColor.r += ray.color.r * ray.intensity;
+            rec.receivedColor.g += ray.color.g * ray.intensity;
+            rec.receivedColor.b += ray.color.b * ray.intensity;
+            rec.receivedIntensity += ray.intensity;
+            rec.hitCount += 1;
+          }
+        }
+
+        // Evaluate receiver activation states
+        for (const rec of receivers) {
+          const req = rec.targetColor;
+          const minReq = rec.minIntensity ?? 0.35;
+          const got = rec.receivedColor;
+
+          // Every required channel must meet threshold; non-required channels must remain low
+          const rOk = req.r > 0.5 ? got.r >= minReq : got.r < 0.22;
+          const gOk = req.g > 0.5 ? got.g >= minReq : got.g < 0.22;
+          const bOk = req.b > 0.5 ? got.b >= minReq : got.b < 0.22;
+
+          const wasSolved = rec.isActivated;
+          rec.isActivated = rOk && gOk && bOk;
+          rec.isImpure = !rec.isActivated && rec.hitCount > 0 && (
+            (req.r <= 0.5 && got.r >= 0.22) ||
+            (req.g <= 0.5 && got.g >= 0.22) ||
+            (req.b <= 0.5 && got.b >= 0.22)
+          );
+
+          if (rec.isActivated && !wasSolved) {
+            sfx.playReceiverLock();
+          }
+        }
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // 3. EIGHT HAND-CRAFTED CAMPAIGN LEVELS (VERIFIED SOLVABLE)
+    // ---------------------------------------------------------------------------
+    const CAMPAIGN_LEVELS = [
+      {
+        id: 1,
+        title: 'Incident Angle',
+        principle: 'θᵢ = θᵣ Specular Reflection',
+        par: 2,
+        description: 'Align the front-surface mirror to reflect the cyan laser beam 90° into the target energy receiver.',
+        objects: [
+          { id: 'e1', type: 'emitter', x: -6.5, z: -1.5, angle: 0, color: { r: 0, g: 1, b: 1 }, intensity: 1.0, movable: false, rotatable: false },
+          { id: 'm1', type: 'mirror', x: -1.0, z: 2.5, angle: Math.PI * 0.85, movable: true, rotatable: true },
+          { id: 'r1', type: 'receiver', x: 2.5, z: 4.5, angle: 0, targetColor: { r: 0, g: 1, b: 1 }, minIntensity: 0.4, movable: false, rotatable: false }
+        ]
+      },
+      {
+        id: 2,
+        title: 'Periscope Matrix',
+        principle: 'Multi-Bounce Beam Relay',
+        par: 4,
+        description: 'A titanium bulkhead blocks the direct beam path. Use two mirrors to route the emerald laser around the barrier.',
+        objects: [
+          { id: 'e1', type: 'emitter', x: -7.5, z: -3.0, angle: 0, color: { r: 0, g: 1, b: 0 }, intensity: 1.0, movable: false, rotatable: false },
+          { id: 'w1', type: 'wall', x: 0.0, z: -3.0, angle: Math.PI / 2, width: 3.6, depth: 0.5, movable: false, rotatable: false },
+          { id: 'm1', type: 'mirror', x: -4.5, z: 1.0, angle: -Math.PI * 0.6, movable: true, rotatable: true },
+          { id: 'm2', type: 'mirror', x: 2.0, z: 3.5, angle: Math.PI * 0.2, movable: true, rotatable: true },
+          { id: 'r1', type: 'receiver', x: 7.5, z: 3.0, angle: 0, targetColor: { r: 0, g: 1, b: 0 }, minIntensity: 0.4, movable: false, rotatable: false }
+        ]
+      },
+      {
+        id: 3,
+        title: 'Snell’s Bend',
+        principle: 'n₁ sin(θ₁) = n₂ sin(θ₂)',
+        par: 2,
+        description: 'Refract the golden beam through the crown-glass equilateral prism (n = 1.55) to bend its trajectory into the offset receiver.',
+        objects: [
+          { id: 'e1', type: 'emitter', x: -7.5, z: -1.5, angle: 0, color: { r: 1, g: 1, b: 0 }, intensity: 1.0, movable: false, rotatable: false },
+          { id: 'w1', type: 'wall', x: 3.5, z: -1.5, angle: Math.PI / 2, width: 3.2, depth: 0.5, movable: false, rotatable: false },
+          { id: 'p1', type: 'prism', x: -1.5, z: 2.2, angle: 0.25, ior: 1.55, movable: true, rotatable: true },
+          { id: 'r1', type: 'receiver', x: 4.5, z: 3.2, angle: 0, targetColor: { r: 1, g: 1, b: 0 }, minIntensity: 0.4, movable: false, rotatable: false }
+        ]
+      },
+      {
+        id: 4,
+        title: 'Quantum Splitter',
+        principle: '50/50 Intensity Conservation',
+        par: 3,
+        description: 'Divide a single high-intensity blue laser into two coherent half-beams using the 50/50 beam splitter to charge both receivers simultaneously.',
+        objects: [
+          { id: 'e1', type: 'emitter', x: -7.5, z: -1.0, angle: 0, color: { r: 0, g: 0, b: 1 }, intensity: 1.1, movable: false, rotatable: false },
+          { id: 's1', type: 'splitter', x: -2.5, z: 2.5, angle: 0.2, movable: true, rotatable: true },
+          { id: 'm1', type: 'mirror', x: 3.5, z: 3.5, angle: -Math.PI * 0.75, movable: true, rotatable: true },
+          { id: 'r1', type: 'receiver', x: 7.0, z: -1.0, angle: 0, targetColor: { r: 0, g: 0, b: 1 }, minIntensity: 0.35, movable: false, rotatable: false },
+          { id: 'r2', type: 'receiver', x: 0.0, z: 4.5, angle: 0, targetColor: { r: 0, g: 0, b: 1 }, minIntensity: 0.35, movable: false, rotatable: false }
+        ]
+      },
+      {
+        id: 5,
+        title: 'Spectral Isolation',
+        principle: 'Dichroic RGB Attenuation',
+        par: 5,
+        description: 'Colored receivers reject impure broadband white light. Split the white laser and filter each branch into pure Red and Cyan wavelengths.',
+        objects: [
+          { id: 'e1', type: 'emitter', x: -7.5, z: -3.5, angle: 0, color: { r: 1, g: 1, b: 1 }, intensity: 1.1, movable: false, rotatable: false },
+          { id: 's1', type: 'splitter', x: -3.5, z: -1.5, angle: 0.4, movable: true, rotatable: true },
+          { id: 'm1', type: 'mirror', x: -3.0, z: 3.5, angle: -Math.PI * 0.25, movable: true, rotatable: true },
+          { id: 'f1', type: 'filter', x: 2.0, z: -3.5, angle: 0, filterColor: { r: 1, g: 0, b: 0 }, movable: true, rotatable: true },
+          { id: 'f2', type: 'filter', x: 2.0, z: 3.5, angle: 0, filterColor: { r: 0, g: 1, b: 1 }, movable: true, rotatable: true },
+          { id: 'r1', type: 'receiver', x: 7.0, z: -3.5, angle: 0, targetColor: { r: 1, g: 0, b: 0 }, minIntensity: 0.35, movable: false, rotatable: false },
+          { id: 'r2', type: 'receiver', x: 7.0, z: 3.5, angle: 0, targetColor: { r: 0, g: 1, b: 1 }, minIntensity: 0.35, movable: false, rotatable: false }
+        ]
+      },
+      {
+        id: 6,
+        title: 'Additive Synthesis',
+        principle: 'Red + Green = Yellow Mixing',
+        par: 4,
+        description: 'Synthesize a Yellow optical signature by converging both the Red and Green laser beams onto the central target core.',
+        objects: [
+          { id: 'e1', type: 'emitter', x: -7.5, z: -3.5, angle: 0, color: { r: 1, g: 0, b: 0 }, intensity: 1.0, movable: false, rotatable: false },
+          { id: 'e2', type: 'emitter', x: -7.5, z: 3.5, angle: 0, color: { r: 0, g: 1, b: 0 }, intensity: 1.0, movable: false, rotatable: false },
+          { id: 'w1', type: 'wall', x: 1.0, z: 0.0, angle: Math.PI / 2, width: 2.4, depth: 0.5, movable: false, rotatable: false },
+          { id: 'm1', type: 'mirror', x: -2.0, z: -4.5, angle: -Math.PI * 0.65, movable: true, rotatable: true },
+          { id: 'm2', type: 'mirror', x: -2.0, z: 4.5, angle: Math.PI * 0.65, movable: true, rotatable: true },
+          { id: 'r1', type: 'receiver', x: 6.5, z: 0.0, angle: 0, targetColor: { r: 1, g: 1, b: 0 }, minIntensity: 0.4, movable: false, rotatable: false }
+        ]
+      },
+      {
+        id: 7,
+        title: 'Refractive Labyrinth',
+        principle: 'Lens & Prism Navigation',
+        par: 6,
+        description: 'Navigate staggered lab bulkheads using a biconvex glass lens, a glass prism, a mirror, and a blue spectral filter.',
+        objects: [
+          { id: 'e1', type: 'emitter', x: -8.0, z: -3.5, angle: 0, color: { r: 1, g: 1, b: 1 }, intensity: 1.1, movable: false, rotatable: false },
+          { id: 'w1', type: 'wall', x: -1.5, z: -2.8, angle: Math.PI / 2, width: 4.2, depth: 0.5, movable: false, rotatable: false },
+          { id: 'w2', type: 'wall', x: 3.0, z: 2.2, angle: Math.PI / 2, width: 4.2, depth: 0.5, movable: false, rotatable: false },
+          { id: 'l1', type: 'lens', x: -5.0, z: 1.5, angle: 0.3, ior: 1.65, movable: true, rotatable: true },
+          { id: 'm1', type: 'mirror', x: -4.5, z: 4.2, angle: Math.PI * 0.75, movable: true, rotatable: true },
+          { id: 'p1', type: 'prism', x: 0.5, z: 3.5, angle: 0.1, ior: 1.55, movable: true, rotatable: true },
+          { id: 'f1', type: 'filter', x: 4.5, z: -2.5, angle: 0, filterColor: { r: 0, g: 0, b: 1 }, movable: true, rotatable: true },
+          { id: 'r1', type: 'receiver', x: 8.0, z: -2.5, angle: 0, targetColor: { r: 0, g: 0, b: 1 }, minIntensity: 0.35, movable: false, rotatable: false }
+        ]
+      },
+      {
+        id: 8,
+        title: 'The PRISM Protocol',
+        principle: 'Unified Multi-Receiver Optics',
+        par: 7,
+        description: 'Capstone challenge: Power the Green, Cyan, and Magenta receivers simultaneously using beam splitting, prism refraction, spectral filtering, and additive RGB fusion.',
+        objects: [
+          { id: 'e1', type: 'emitter', x: -8.0, z: -2.5, angle: 0, color: { r: 1, g: 1, b: 1 }, intensity: 1.2, movable: false, rotatable: false },
+          { id: 'e2', type: 'emitter', x: -8.0, z: 3.5, angle: 0, color: { r: 0, g: 0, b: 1 }, intensity: 1.1, movable: false, rotatable: false },
+          { id: 's1', type: 'splitter', x: -4.0, z: -4.2, angle: 0.35, movable: true, rotatable: true },
+          { id: 'f1', type: 'filter', x: 1.0, z: -4.2, angle: 0, filterColor: { r: 0, g: 1, b: 0 }, movable: true, rotatable: true },
+          { id: 'f2', type: 'filter', x: -1.5, z: 0.2, angle: 0.5, filterColor: { r: 1, g: 0, b: 0 }, movable: true, rotatable: true },
+          { id: 's2', type: 'splitter', x: -3.5, z: 4.5, angle: -0.35, movable: true, rotatable: true },
+          { id: 'p1', type: 'prism', x: 2.0, z: 4.5, angle: 0.2, ior: 1.55, movable: true, rotatable: true },
+          { id: 'm1', type: 'mirror', x: 3.2, z: -1.2, angle: -Math.PI * 0.65, movable: true, rotatable: true },
+          { id: 'r1', type: 'receiver', x: 7.5, z: -4.2, angle: 0, targetColor: { r: 0, g: 1, b: 0 }, minIntensity: 0.35, movable: false, rotatable: false },
+          { id: 'r2', type: 'receiver', x: 7.5, z: 0.5, angle: 0, targetColor: { r: 1, g: 0, b: 1 }, minIntensity: 0.35, movable: false, rotatable: false },
+          { id: 'r3', type: 'receiver', x: 7.5, z: 4.2, angle: 0, targetColor: { r: 0, g: 0, b: 1 }, minIntensity: 0.35, movable: false, rotatable: false }
+        ]
+      }
+    ];
+
+    // ---------------------------------------------------------------------------
+    // 4. THREE.JS 3D LABORATORY RENDERER & INTERACTION CONTROLLER
+    // ---------------------------------------------------------------------------
+    class PrismLabApp {
+      constructor() {
+        this.container = document.getElementById('canvas-container');
+        this.optics = new OpticsEngine();
+
+        this.mode = 'campaign'; // 'campaign' | 'sandbox'
+        this.currentLevelIndex = 0;
+        this.objects = [];
+        this.selectedId = null;
+        this.lasersActive = true;
+        this.gridSnap = true;
+        this.moveCount = 0;
+        this.levelSolved = false;
+        this.sandboxCounter = 1;
+
+        // Camera spherical orbit state
+        this.camTarget = new THREE.Vector3(0, 0.5, 0);
+        this.camSpherical = { radius: 18.5, theta: 0.0, phi: 0.68 };
+        this.camGoal = { radius: 18.5, theta: 0.0, phi: 0.68 };
+
+        // Pointer / Drag state
+        this.isOrbiting = false;
+        this.isDraggingObject = false;
+        this.dragOffset = new THREE.Vector3();
+        this.pointerDownPos = { x: 0, y: 0 };
+        this.lastPointerPos = { x: 0, y: 0 };
+        this.raycaster = new THREE.Raycaster();
+        this.mouseNDC = new THREE.Vector2();
+        this.benchPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -BEAM_Y);
+
+        // Keyboard held flags for smooth rotation
+        this.keysHeld = {};
+
+        // Three.js object maps
+        this.objectMeshes = new Map();
+        this.beamGroup = new THREE.Group();
+        this.sparkGroup = new THREE.Group();
+        this.photonPackets = [];
+        this.dynamicLights = [];
+        this.holoRings = [];
+
+        this.initThree();
+        this.buildLabEnvironment();
+        this.bindEvents();
+        this.loadLevel(0);
+      }
+
+      initThree() {
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x040914);
+        this.scene.fog = new THREE.FogExp2(0x040914, 0.022);
+
+        const width = this.container.clientWidth || window.innerWidth;
+        const height = this.container.clientHeight || window.innerHeight;
+
+        this.camera = new THREE.PerspectiveCamera(44, width / height, 0.1, 120);
+        this.updateCameraTransform(true);
+
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        this.renderer.setSize(width, height);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.25;
+        this.container.appendChild(this.renderer.domElement);
+
+        // Generate procedural reflection environment map for realistic glass & metallic highlights
+        this.generateStudioEnvMap();
+
+        // Ambient & Architectural Studio Lighting
+        const hemiLight = new THREE.HemisphereLight(0x38bdf8, 0x0f172a, 0.65);
+        this.scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xe0f2fe, 0.95);
+        dirLight.position.set(8, 18, 10);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 2;
+        dirLight.shadow.camera.far = 45;
+        const d = 14;
+        dirLight.shadow.camera.left = -d;
+        dirLight.shadow.camera.right = d;
+        dirLight.shadow.camera.top = d;
+        dirLight.shadow.camera.bottom = -d;
+        dirLight.shadow.bias = -0.0005;
+        this.scene.add(dirLight);
+
+        const rimLight = new THREE.DirectionalLight(0x0284c7, 0.45);
+        rimLight.position.set(-12, 10, -10);
+        this.scene.add(rimLight);
+
+        // Create pool of dynamic point lights that follow laser impact nodes
+        for (let i = 0; i < 6; i++) {
+          const pl = new THREE.PointLight(0x38bdf8, 0, 5.5, 1.8);
+          this.scene.add(pl);
+          this.dynamicLights.push(pl);
+        }
+
+        // Glow sprite texture for flares & sparks
+        this.glowTexture = this.createRadialGlowTexture();
+
+        this.scene.add(this.beamGroup);
+        this.scene.add(this.sparkGroup);
+      }
+
+      generateStudioEnvMap() {
+        const pmrem = new THREE.PMREMGenerator(this.renderer);
+        pmrem.compileEquirectangularShader();
+
+        const envScene = new THREE.Scene();
+        envScene.background = new THREE.Color(0x060d1d);
+
+        // Add bright cyan & warm studio light strips to the reflection environment
+        const stripGeo = new THREE.BoxGeometry(20, 0.4, 2);
+        const cyanMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+        const warmMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+        const whiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+        const s1 = new THREE.Mesh(stripGeo, cyanMat);
+        s1.position.set(0, 12, -12);
+        envScene.add(s1);
+
+        const s2 = new THREE.Mesh(stripGeo, whiteMat);
+        s2.position.set(0, 14, 0);
+        envScene.add(s2);
+
+        const s3 = new THREE.Mesh(stripGeo, warmMat);
+        s3.position.set(12, 10, 12);
+        envScene.add(s3);
+
+        const envRT = pmrem.fromScene(envScene, 0.04);
+        this.scene.environment = envRT.texture;
+        pmrem.dispose();
+      }
+
+      createRadialGlowTexture() {
+        const size = 128;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+        grad.addColorStop(0.0, 'rgba(255,255,255,1)');
+        grad.addColorStop(0.22, 'rgba(255,255,255,0.85)');
+        grad.addColorStop(0.55, 'rgba(255,255,255,0.22)');
+        grad.addColorStop(1.0, 'rgba(255,255,255,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, size, size);
+        const tex = new THREE.CanvasTexture(canvas);
+        return tex;
+      }
+
+      createBenchGridTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1024;
+        canvas.height = 1024;
+        const ctx = canvas.getContext('2d');
+
+        // Dark brushed metallic slate base
+        ctx.fillStyle = '#0a1220';
+        ctx.fillRect(0, 0, 1024, 1024);
+
+        // Subtle micro-grain
+        for (let i = 0; i < 6000; i++) {
+          ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'rgba(0,0,0,0.06)';
+          ctx.fillRect(Math.random() * 1024, Math.random() * 1024, 2, 2);
+        }
+
+        // Sub-grid lines
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.09)';
+        ctx.lineWidth = 1;
+        const step = 32;
+        for (let x = 0; x <= 1024; x += step) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, 1024);
+          ctx.stroke();
+        }
+        for (let y = 0; y <= 1024; y += step) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(1024, y);
+          ctx.stroke();
+        }
+
+        // Major optical breadboard grid lines
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.24)';
+        ctx.lineWidth = 2;
+        for (let x = 0; x <= 1024; x += step * 4) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, 1024);
+          ctx.stroke();
+        }
+        for (let y = 0; y <= 1024; y += step * 4) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(1024, y);
+          ctx.stroke();
+        }
+
+        // Breadboard mounting bolt dots at intersections
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.35)';
+        for (let x = step; x < 1024; x += step) {
+          for (let y = step; y < 1024; y += step) {
+            ctx.beginPath();
+            ctx.arc(x, y, 1.6, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(3, 2);
+        tex.anisotropy = 8;
+        return tex;
+      }
+
+      buildLabEnvironment() {
+        // 1. Optical Workbench Table Surface
+        const benchW = LAB_BOUNDS.maxX - LAB_BOUNDS.minX; // 21
+        const benchD = LAB_BOUNDS.maxZ - LAB_BOUNDS.minZ; // 13.6
+        const benchGeo = new THREE.BoxGeometry(benchW, 0.6, benchD);
+        const benchTex = this.createBenchGridTexture();
+        const benchMat = new THREE.MeshStandardMaterial({
+          map: benchTex,
+          roughness: 0.32,
+          metalness: 0.72
+        });
+        const benchMesh = new THREE.Mesh(benchGeo, benchMat);
+        benchMesh.position.set(0, -0.3, 0);
+        benchMesh.receiveShadow = true;
+        this.scene.add(benchMesh);
+
+        // Glowing containment rail bezel around the optical table
+        const frameMat = new THREE.MeshStandardMaterial({
+          color: 0x1e293b,
+          metalness: 0.85,
+          roughness: 0.25
+        });
+        const neonRailMat = new THREE.MeshBasicMaterial({ color: 0x0ea5e9 });
+
+        const railSpecs = [
+          { w: benchW + 0.6, d: 0.3, x: 0, z: LAB_BOUNDS.minZ - 0.15 },
+          { w: benchW + 0.6, d: 0.3, x: 0, z: LAB_BOUNDS.maxZ + 0.15 },
+          { w: 0.3, d: benchD, x: LAB_BOUNDS.minX - 0.15, z: 0 },
+          { w: 0.3, d: benchD, x: LAB_BOUNDS.maxX + 0.15, z: 0 }
+        ];
+
+        for (const r of railSpecs) {
+          const m = new THREE.Mesh(new THREE.BoxGeometry(r.w, 0.75, r.d), frameMat);
+          m.position.set(r.x, -0.15, r.z);
+          this.scene.add(m);
+
+          const strip = new THREE.Mesh(new THREE.BoxGeometry(r.w * 0.98, 0.06, r.d * 0.35), neonRailMat);
+          strip.position.set(r.x, 0.24, r.z);
+          this.scene.add(strip);
+        }
+
+        // 2. Futuristic Reflective Metallic Chamber Walls & Columns
+        const wallMat = new THREE.MeshStandardMaterial({
+          color: 0x0b1324,
+          metalness: 0.88,
+          roughness: 0.24
+        });
+        const columnMat = new THREE.MeshStandardMaterial({
+          color: 0x17253b,
+          metalness: 0.9,
+          roughness: 0.2
+        });
+
+        const chamberRadius = 22;
+        const wallSegments = 8;
+        for (let i = 0; i < wallSegments; i++) {
+          const theta = (i / wallSegments) * Math.PI * 2;
+          const nextTheta = ((i + 1) / wallSegments) * Math.PI * 2;
+          const midTheta = (theta + nextTheta) * 0.5;
+          const segLen = 2 * chamberRadius * Math.sin(Math.PI / wallSegments);
+
+          const wall = new THREE.Mesh(new THREE.BoxGeometry(segLen, 14, 0.5), wallMat);
+          wall.position.set(Math.cos(midTheta) * chamberRadius, 4, Math.sin(midTheta) * chamberRadius);
+          wall.rotation.y = -midTheta + Math.PI / 2;
+          this.scene.add(wall);
+
+          // Glowing horizontal architectural light band on wall
+          const band = new THREE.Mesh(
+            new THREE.BoxGeometry(segLen * 0.92, 0.12, 0.55),
+            new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0x0284c7 : 0x0d9488 })
+          );
+          band.position.set(Math.cos(midTheta) * chamberRadius, 3.2, Math.sin(midTheta) * chamberRadius);
+          band.rotation.y = -midTheta + Math.PI / 2;
+          this.scene.add(band);
+
+          // Structural pillar at vertex
+          const col = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, 14, 8), columnMat);
+          col.position.set(Math.cos(theta) * chamberRadius, 4, Math.sin(theta) * chamberRadius);
+          this.scene.add(col);
+        }
+
+        // Decorative decorative crystal clusters outside the workbench perimeter
+        const crystalMat = new THREE.MeshPhysicalMaterial({
+          color: 0x38bdf8,
+          transmission: 0.85,
+          ior: 1.6,
+          roughness: 0.1,
+          metalness: 0.1,
+          transparent: true,
+          opacity: 0.9
+        });
+        const decorCoords = [
+          { x: -13.5, z: -8.5, s: 1.4 },
+          { x: 13.5, z: -8.5, s: 1.2 },
+          { x: -13.5, z: 8.5, s: 1.3 },
+          { x: 13.5, z: 8.5, s: 1.5 }
+        ];
+        for (const dc of decorCoords) {
+          const cluster = new THREE.Group();
+          for (let j = 0; j < 3; j++) {
+            const spire = new THREE.Mesh(new THREE.OctahedronGeometry(0.6 * dc.s, 0), crystalMat);
+            spire.scale.set(0.55, 2.4 - j * 0.4, 0.55);
+            spire.position.set((j - 1) * 0.5, 0.8, (j % 2) * 0.4);
+            spire.rotation.set((j - 1) * 0.2, j * 0.8, (1 - j) * 0.18);
+            cluster.add(spire);
+          }
+          cluster.position.set(dc.x, -0.5, dc.z);
+          this.scene.add(cluster);
+        }
+
+        // Animated Holographic Telemetry Rings floating above corners of the lab
+        const holoRingPositions = [
+          { x: -12.2, y: 4.5, z: -7.5 },
+          { x: 12.2, y: 4.5, z: -7.5 }
+        ];
+        for (const hp of holoRingPositions) {
+          const holoGroup = new THREE.Group();
+          holoGroup.position.set(hp.x, hp.y, hp.z);
+          holoGroup.lookAt(0, 1.5, 0);
+
+          const r1 = new THREE.Mesh(
+            new THREE.RingGeometry(1.1, 1.18, 48),
+            new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide, transparent: true, opacity: 0.45 })
+          );
+          const r2 = new THREE.Mesh(
+            new THREE.RingGeometry(0.72, 0.78, 32, 1, 0, Math.PI * 1.4),
+            new THREE.MeshBasicMaterial({ color: 0xfbbf24, side: THREE.DoubleSide, transparent: true, opacity: 0.55 })
+          );
+          holoGroup.add(r1, r2);
+          this.scene.add(holoGroup);
+          this.holoRings.push({ group: holoGroup, r1, r2 });
+        }
+
+        // Selection Ring Gizmo (follows currently selected object)
+        this.selectionGizmo = new THREE.Group();
+        const selRing = new THREE.Mesh(
+          new THREE.RingGeometry(1.12, 1.25, 48),
+          new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })
+        );
+        selRing.rotation.x = -Math.PI / 2;
+        selRing.position.y = 0.04;
+
+        // Forward direction arrow indicator on gizmo
+        const arrowCone = new THREE.Mesh(
+          new THREE.ConeGeometry(0.16, 0.36, 12),
+          new THREE.MeshBasicMaterial({ color: 0xfbbf24 })
+        );
+        arrowCone.rotation.z = -Math.PI / 2;
+        arrowCone.position.set(1.38, 0.08, 0);
+
+        this.selectionGizmo.add(selRing, arrowCone);
+        this.selectionGizmo.visible = false;
+        this.scene.add(this.selectionGizmo);
+      }
+
+      /**
+       * Create detailed 3D mesh group for an optical device
+       */
+      createObjectMesh(obj) {
+        const group = new THREE.Group();
+        group.userData.objectId = obj.id;
+
+        const baseMat = new THREE.MeshStandardMaterial({
+          color: obj.movable ? 0x1e293b : 0x0f172a,
+          metalness: 0.85,
+          roughness: 0.25
+        });
+        const accentMat = new THREE.MeshBasicMaterial({
+          color: obj.movable ? 0x38bdf8 : 0x64748b
+        });
+
+        // Precision optical mount pedestal (common to all optical devices except walls)
+        if (obj.type !== 'wall') {
+          const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.78, 0.16, 32), baseMat);
+          pedestal.position.y = 0.08;
+          pedestal.castShadow = true;
+          pedestal.receiveShadow = true;
+          group.add(pedestal);
+
+          const trimRing = new THREE.Mesh(new THREE.TorusGeometry(0.73, 0.02, 8, 32), accentMat);
+          trimRing.rotation.x = Math.PI / 2;
+          trimRing.position.y = 0.16;
+          group.add(trimRing);
+        }
+
+        if (obj.type === 'emitter') {
+          const hexColor = rgbToHex(obj.color);
+          const body = new THREE.Mesh(
+            new THREE.BoxGeometry(1.1, 0.65, 0.85),
+            new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85, roughness: 0.22 })
+          );
+          body.position.y = BEAM_Y;
+          body.castShadow = true;
+          group.add(body);
+
+          // Cooling fins
+          for (let i = -1; i <= 1; i++) {
+            const fin = new THREE.Mesh(
+              new THREE.BoxGeometry(0.65, 0.72, 0.92),
+              new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.2 })
+            );
+            fin.position.set(-0.15 + i * 0.22, BEAM_Y, 0);
+            group.add(fin);
+          }
+
+          // Glowing laser emitter nozzle along +localX
+          const nozzle = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.22, 0.26, 0.28, 24),
+            new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.15 })
+          );
+          nozzle.rotation.z = -Math.PI / 2;
+          nozzle.position.set(0.56, BEAM_Y, 0);
+          group.add(nozzle);
+
+          const lensGlow = new THREE.Mesh(
+            new THREE.SphereGeometry(0.17, 16, 16),
+            new THREE.MeshBasicMaterial({ color: hexColor })
+          );
+          lensGlow.position.set(0.64, BEAM_Y, 0);
+          lensGlow.name = 'emitterCore';
+          group.add(lensGlow);
+        } else if (obj.type === 'mirror') {
+          // Metallic rear housing (-localX side)
+          const housing = new THREE.Mesh(
+            new THREE.BoxGeometry(0.14, 1.15, 1.9),
+            new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.88, roughness: 0.28 })
+          );
+          housing.position.set(-0.07, BEAM_Y, 0);
+          housing.castShadow = true;
+          group.add(housing);
+
+          // High-reflectivity front dielectric mirror face (+localX side)
+          const mirrorFace = new THREE.Mesh(
+            new THREE.BoxGeometry(0.04, 1.08, 1.84),
+            new THREE.MeshStandardMaterial({
+              color: 0xe0f2fe,
+              metalness: 0.98,
+              roughness: 0.04,
+              emissive: 0x0284c7,
+              emissiveIntensity: 0.18
+            })
+          );
+          mirrorFace.position.set(0.01, BEAM_Y, 0);
+          group.add(mirrorFace);
+
+          // Cyan front-indicator edge bar so player always sees reflective side
+          const frontBar = new THREE.Mesh(
+            new THREE.BoxGeometry(0.05, 0.06, 1.88),
+            new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+          );
+          frontBar.position.set(0.02, BEAM_Y + 0.56, 0);
+          group.add(frontBar);
+        } else if (obj.type === 'prism') {
+          // Equilateral triangular prism extruded in Y
+          const R = 1.05;
+          const shape = new THREE.Shape();
+          for (let i = 0; i < 3; i++) {
+            const a = (i * 2 * Math.PI) / 3;
+            const px = R * Math.cos(a);
+            const py = -R * Math.sin(a); // Shape Y maps to -Z after rotateX(-PI/2)
+            if (i === 0) shape.moveTo(px, py);
+            else shape.lineTo(px, py);
+          }
+          shape.closePath();
+
+          const extrudeGeo = new THREE.ExtrudeGeometry(shape, {
+            depth: 1.15,
+            bevelEnabled: true,
+            bevelThickness: 0.03,
+            bevelSize: 0.03,
+            bevelSegments: 2
+          });
+          extrudeGeo.rotateX(-Math.PI / 2);
+
+          const glassMat = new THREE.MeshPhysicalMaterial({
+            color: 0xc7d2fe,
+            transmission: 0.92,
+            ior: obj.ior || 1.52,
+            roughness: 0.05,
+            metalness: 0.05,
+            thickness: 1.2,
+            transparent: true,
+            opacity: 0.95
+          });
+
+          const prismMesh = new THREE.Mesh(extrudeGeo, glassMat);
+          prismMesh.position.y = 0.18;
+          group.add(prismMesh);
+
+          // Luminous facet edges for crisp readability
+          const edges = new THREE.EdgesGeometry(extrudeGeo);
+          const line = new THREE.LineSegments(
+            edges,
+            new THREE.LineBasicMaterial({ color: 0x818cf8, transparent: true, opacity: 0.65 })
+          );
+          line.position.y = 0.18;
+          group.add(line);
+        } else if (obj.type === 'lens') {
+          // Biconvex optical glass lens
+          const halfChord = 0.95;
+          const R = 1.65;
+          const sagitta = R - Math.sqrt(R * R - halfChord * halfChord);
+          const thetaMax = Math.asin(halfChord / R);
+
+          const shape = new THREE.Shape();
+          // Front arc (+localX)
+          shape.absarc(-(R - sagitta), 0, R, -thetaMax, thetaMax, false);
+          // Back arc (-localX)
+          shape.absarc(R - sagitta, 0, R, Math.PI - thetaMax, Math.PI + thetaMax, false);
+          shape.closePath();
+
+          const extrudeGeo = new THREE.ExtrudeGeometry(shape, {
+            depth: 1.1,
+            bevelEnabled: true,
+            bevelThickness: 0.02,
+            bevelSize: 0.02,
+            bevelSegments: 2
+          });
+          extrudeGeo.rotateX(-Math.PI / 2);
+
+          const lensMat = new THREE.MeshPhysicalMaterial({
+            color: 0x99f6e4,
+            transmission: 0.94,
+            ior: obj.ior || 1.6,
+            roughness: 0.04,
+            metalness: 0.04,
+            thickness: 1.0,
+            transparent: true,
+            opacity: 0.95
+          });
+
+          const lensMesh = new THREE.Mesh(extrudeGeo, lensMat);
+          lensMesh.position.y = 0.2;
+          group.add(lensMesh);
+
+          const edges = new THREE.EdgesGeometry(extrudeGeo);
+          const line = new THREE.LineSegments(
+            edges,
+            new THREE.LineBasicMaterial({ color: 0x2dd4bf, transparent: true, opacity: 0.65 })
+          );
+          line.position.y = 0.2;
+          group.add(line);
+        } else if (obj.type === 'splitter') {
+          // Semi-silvered 50/50 beam splitter plate with metallic frame
+          const plate = new THREE.Mesh(
+            new THREE.BoxGeometry(0.06, 1.08, 1.8),
+            new THREE.MeshPhysicalMaterial({
+              color: 0x38bdf8,
+              transmission: 0.65,
+              roughness: 0.06,
+              metalness: 0.35,
+              transparent: true,
+              opacity: 0.78
+            })
+          );
+          plate.position.y = BEAM_Y;
+          group.add(plate);
+
+          // Top & bottom metallic clamping bars
+          const topBar = new THREE.Mesh(
+            new THREE.BoxGeometry(0.16, 0.08, 1.88),
+            new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.2 })
+          );
+          topBar.position.y = BEAM_Y + 0.56;
+          const botBar = topBar.clone();
+          botBar.position.y = BEAM_Y - 0.56;
+          group.add(topBar, botBar);
+        } else if (obj.type === 'filter') {
+          const fcHex = rgbToHex(obj.filterColor || { r: 1, g: 0, b: 0 });
+          const filterGlass = new THREE.Mesh(
+            new THREE.BoxGeometry(0.08, 1.08, 1.8),
+            new THREE.MeshPhysicalMaterial({
+              color: fcHex,
+              emissive: fcHex,
+              emissiveIntensity: 0.35,
+              transmission: 0.72,
+              roughness: 0.08,
+              transparent: true,
+              opacity: 0.85
+            })
+          );
+          filterGlass.position.y = BEAM_Y;
+          filterGlass.name = 'filterGlass';
+          group.add(filterGlass);
+
+          const frame = new THREE.LineSegments(
+            new THREE.EdgesGeometry(new THREE.BoxGeometry(0.1, 1.1, 1.82)),
+            new THREE.LineBasicMaterial({ color: fcHex })
+          );
+          frame.position.y = BEAM_Y;
+          frame.name = 'filterFrame';
+          group.add(frame);
+        } else if (obj.type === 'receiver') {
+          const tcHex = rgbToHex(obj.targetColor);
+          // Outer armored sensor cage
+          const ring = new THREE.Mesh(
+            new THREE.TorusGeometry(0.56, 0.08, 16, 32),
+            new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.88, roughness: 0.22 })
+          );
+          ring.rotation.x = Math.PI / 2;
+          ring.position.y = BEAM_Y;
+          group.add(ring);
+
+          // Target color indicator ring
+          const targetHalo = new THREE.Mesh(
+            new THREE.TorusGeometry(0.62, 0.03, 12, 32),
+            new THREE.MeshBasicMaterial({ color: tcHex })
+          );
+          targetHalo.rotation.x = Math.PI / 2;
+          targetHalo.position.y = BEAM_Y;
+          targetHalo.name = 'receiverTargetHalo';
+          group.add(targetHalo);
+
+          // Inner crystalline energy core
+          const core = new THREE.Mesh(
+            new THREE.OctahedronGeometry(0.38, 1),
+            new THREE.MeshStandardMaterial({
+              color: tcHex,
+              emissive: tcHex,
+              emissiveIntensity: 0.3,
+              roughness: 0.15,
+              metalness: 0.2
+            })
+          );
+          core.position.y = BEAM_Y;
+          core.name = 'receiverCore';
+          group.add(core);
+        } else if (obj.type === 'wall') {
+          const w = obj.width || 2.2;
+          const d = obj.depth || 0.45;
+          const wallMesh = new THREE.Mesh(
+            new THREE.BoxGeometry(w, 1.35, d),
+            new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85, roughness: 0.3 })
+          );
+          wallMesh.position.y = 0.675;
+          wallMesh.castShadow = true;
+          wallMesh.receiveShadow = true;
+          group.add(wallMesh);
+
+          const warningStripe = new THREE.Mesh(
+            new THREE.BoxGeometry(w + 0.02, 0.08, d + 0.02),
+            new THREE.MeshBasicMaterial({ color: 0xf59e0b })
+          );
+          warningStripe.position.y = 1.25;
+          group.add(warningStripe);
+        }
+
+        // Invisible larger hit cylinder for effortless mouse/touch selection & dragging
+        const hitMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(1.05, 1.05, 1.4, 16),
+          new THREE.MeshBasicMaterial({ visible: false })
+        );
+        hitMesh.position.y = 0.7;
+        hitMesh.userData.objectId = obj.id;
+        group.add(hitMesh);
+
+        // Apply position and rotation (note: in Three.js, rotation.y = -angle matches XZ trig (cos a, sin a))
+        group.position.set(obj.x, 0, obj.z);
+        group.rotation.y = -obj.angle;
+
+        return group;
+      }
+
+      rebuildSceneObjects() {
+        for (const mesh of this.objectMeshes.values()) {
+          this.scene.remove(mesh);
+        }
+        this.objectMeshes.clear();
+
+        for (const obj of this.objects) {
+          const mesh = this.createObjectMesh(obj);
+          this.scene.add(mesh);
+          this.objectMeshes.set(obj.id, mesh);
+        }
+      }
+
+      /**
+       * Re-run ray-optics propagation and rebuild volumetric 3D laser beams & hit sparks
+       */
+      updateOpticsAndBeams() {
+        this.optics.traceScene(this.objects, this.lasersActive);
+
+        // Clear old beam meshes & spark sprites
+        while (this.beamGroup.children.length > 0) {
+          const child = this.beamGroup.children[0];
+          this.beamGroup.remove(child);
+        }
+        while (this.sparkGroup.children.length > 0) {
+          const child = this.sparkGroup.children[0];
+          this.sparkGroup.remove(child);
+        }
+        this.photonPackets = [];
+
+        // Turn off dynamic lights before reassigning
+        for (const pl of this.dynamicLights) {
+          pl.intensity = 0;
+        }
+
+        // Render multi-layered volumetric laser beams
+        for (const seg of this.optics.segments) {
+          const p1 = new THREE.Vector3(seg.start.x, seg.start.y, seg.start.z);
+          const p2 = new THREE.Vector3(seg.end.x, seg.end.y, seg.end.z);
+          const dir = new THREE.Vector3().subVectors(p2, p1);
+          const len = dir.length();
+          if (len < 0.005) continue;
+
+          const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+          const quat = new THREE.Quaternion().setFromUnitVectors(
+            new THREE.Vector3(0, 1, 0),
+            dir.clone().normalize()
+          );
+
+          const beamHex = rgbToHex(seg.color);
+          const alphaScale = Math.min(1.0, Math.max(0.28, seg.intensity));
+
+          // 1. Bright Inner Plasma Core (tinted slightly toward white for realistic laser radiance)
+          const coreColor = new THREE.Color(beamHex).lerp(new THREE.Color(0xffffff), 0.55);
+          const coreGeo = new THREE.CylinderGeometry(0.032 * Math.sqrt(alphaScale), 0.032 * Math.sqrt(alphaScale), len, 8, 1, true);
+          const coreMat = new THREE.MeshBasicMaterial({
+            color: coreColor,
+            transparent: true,
+            opacity: 0.95 * alphaScale,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+          });
+          const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+          coreMesh.position.copy(mid);
+          coreMesh.quaternion.copy(quat);
+          this.beamGroup.add(coreMesh);
+
+          // 2. Saturated Mid-Glow Sheath
+          const midGeo = new THREE.CylinderGeometry(0.095 * Math.sqrt(alphaScale), 0.095 * Math.sqrt(alphaScale), len, 10, 1, true);
+          const midMat = new THREE.MeshBasicMaterial({
+            color: beamHex,
+            transparent: true,
+            opacity: 0.42 * alphaScale,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+          });
+          const midMesh = new THREE.Mesh(midGeo, midMat);
+          midMesh.position.copy(mid);
+          midMesh.quaternion.copy(quat);
+          this.beamGroup.add(midMesh);
+
+          // 3. Wide Volumetric Atmospheric Halo
+          const haloGeo = new THREE.CylinderGeometry(0.22 * Math.sqrt(alphaScale), 0.22 * Math.sqrt(alphaScale), len, 10, 1, true);
+          const haloMat = new THREE.MeshBasicMaterial({
+            color: beamHex,
+            transparent: true,
+            opacity: 0.14 * alphaScale,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+          });
+          const haloMesh = new THREE.Mesh(haloGeo, haloMat);
+          haloMesh.position.copy(mid);
+          haloMesh.quaternion.copy(quat);
+          this.beamGroup.add(haloMesh);
+
+          // 4. Animated Photon Pulse Packet traveling along segment
+          if (len > 0.6) {
+            const packet = new THREE.Mesh(
+              new THREE.SphereGeometry(0.065, 8, 8),
+              new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.85 * alphaScale,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+              })
+            );
+            this.beamGroup.add(packet);
+            this.photonPackets.push({
+              mesh: packet,
+              p1,
+              p2,
+              len,
+              phase: Math.random()
+            });
+          }
+        }
+
+        // Render impact flares & assign dynamic point lights
+        let lightIdx = 0;
+        for (const hp of this.optics.hitPoints) {
+          const hex = rgbToHex(hp.color);
+          const spriteMat = new THREE.SpriteMaterial({
+            map: this.glowTexture,
+            color: hex,
+            transparent: true,
+            opacity: Math.min(0.95, 0.55 + hp.intensity * 0.4),
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+          });
+          const sprite = new THREE.Sprite(spriteMat);
+          sprite.position.set(hp.x, hp.y, hp.z);
+          const s = 0.55 + hp.intensity * 0.35;
+          sprite.scale.set(s, s, 1);
+          this.sparkGroup.add(sprite);
+
+          if (lightIdx < this.dynamicLights.length) {
+            const pl = this.dynamicLights[lightIdx++];
+            pl.color.setHex(hex);
+            pl.position.set(hp.x, hp.y + 0.35, hp.z);
+            pl.intensity = 1.1 * Math.min(1.2, hp.intensity);
+          }
+        }
+
+        this.updateUI();
+        this.checkPuzzleCompletion();
+      }
+
+      checkPuzzleCompletion() {
+        if (this.mode !== 'campaign') return;
+        const receivers = this.objects.filter(o => o.type === 'receiver');
+        if (receivers.length === 0) return;
+
+        const allSolved = receivers.every(r => r.isActivated);
+        if (allSolved && !this.levelSolved) {
+          this.levelSolved = true;
+          sfx.playLevelSolved();
+          const lvl = CAMPAIGN_LEVELS[this.currentLevelIndex];
+          document.getElementById('solved-title').textContent = `LEVEL 0${lvl.id}: ${lvl.title.toUpperCase()} SOLVED`;
+          document.getElementById('solved-stats').textContent =
+            `All target energy receivers locked at full coherence. Adjustments: ${this.moveCount} (Par: ${lvl.par})`;
+          document.getElementById('solved-modal').classList.remove('hidden');
+
+          const nextBtn = document.getElementById('btn-next-campaign');
+          if (this.currentLevelIndex >= CAMPAIGN_LEVELS.length - 1) {
+            nextBtn.textContent = 'ENTER SANDBOX LAB →';
+          } else {
+            nextBtn.textContent = 'NEXT EXPERIMENT →';
+          }
+        } else if (!allSolved && this.levelSolved) {
+          this.levelSolved = false;
+          document.getElementById('solved-modal').classList.add('hidden');
+        }
+      }
+
+      // -------------------------------------------------------------------------
+      // LEVEL & SANDBOX MANAGEMENT
+      // -------------------------------------------------------------------------
+      loadLevel(index) {
+        this.mode = 'campaign';
+        this.currentLevelIndex = (index + CAMPAIGN_LEVELS.length) % CAMPAIGN_LEVELS.length;
+        const lvl = CAMPAIGN_LEVELS[this.currentLevelIndex];
+
+        // Deep-clone level objects
+        this.objects = JSON.parse(JSON.stringify(lvl.objects));
+        this.moveCount = 0;
+        this.levelSolved = false;
+        this.lasersActive = true;
+
+        // Auto-select first movable object so player can immediately press Q/E or drag
+        const firstMovable = this.objects.find(o => o.movable || o.rotatable);
+        this.selectedId = firstMovable ? firstMovable.id : null;
+
+        document.getElementById('solved-modal').classList.add('hidden');
+        document.getElementById('btn-mode-campaign').classList.add('btn-active', 'text-white');
+        document.getElementById('btn-mode-campaign').classList.remove('text-slate-300');
+        document.getElementById('btn-mode-sandbox').classList.remove('btn-active', 'text-white');
+        document.getElementById('btn-mode-sandbox').classList.add('text-slate-300');
+
+        document.getElementById('campaign-nav').classList.remove('hidden');
+        document.getElementById('panel-mission').classList.remove('hidden');
+        document.getElementById('panel-sandbox').classList.add('hidden');
+
+        document.getElementById('hud-level-tag').textContent = `LEVEL 0${lvl.id} / 0${CAMPAIGN_LEVELS.length}`;
+        document.getElementById('hud-level-title').textContent = lvl.title;
+        document.getElementById('mission-desc').textContent = lvl.description;
+        document.getElementById('mission-principle').textContent = lvl.principle;
+
+        this.rebuildSceneObjects();
+        this.syncSelectionGizmo();
+        this.updateOpticsAndBeams();
+      }
+
+      enterSandbox(presetName = 'default') {
+        this.mode = 'sandbox';
+        this.levelSolved = false;
+        this.lasersActive = true;
+        this.moveCount = 0;
+
+        document.getElementById('solved-modal').classList.add('hidden');
+        document.getElementById('btn-mode-sandbox').classList.add('btn-active', 'text-white');
+        document.getElementById('btn-mode-sandbox').classList.remove('text-slate-300');
+        document.getElementById('btn-mode-campaign').classList.remove('btn-active', 'text-white');
+        document.getElementById('btn-mode-campaign').classList.add('text-slate-300');
+
+        document.getElementById('campaign-nav').classList.add('hidden');
+        document.getElementById('panel-mission').classList.add('hidden');
+        document.getElementById('panel-sandbox').classList.remove('hidden');
+
+        this.loadSandboxPreset(presetName);
+      }
+
+      loadSandboxPreset(preset) {
+        if (preset === 'clear') {
+          this.objects = [];
+          this.selectedId = null;
+        } else if (preset === 'tir') {
+          // Total Internal Reflection demonstration
+          this.objects = [
+            { id: 'sb_1', type: 'emitter', x: -7.0, z: -0.6, angle: 0, color: { r: 0, g: 1, b: 1 }, intensity: 1.1, movable: true, rotatable: true },
+            { id: 'sb_2', type: 'prism', x: -1.5, z: -0.3, angle: 0.52, ior: 1.75, movable: true, rotatable: true },
+            { id: 'sb_3', type: 'mirror', x: 3.5, z: 3.2, angle: -Math.PI * 0.75, movable: true, rotatable: true },
+            { id: 'sb_4', type: 'receiver', x: 7.5, z: 3.2, angle: 0, targetColor: { r: 0, g: 1, b: 1 }, minIntensity: 0.35, movable: true, rotatable: true }
+          ];
+          this.selectedId = 'sb_2';
+        } else if (preset === 'lens') {
+          // Biconvex Lens parallel beam focal convergence
+          this.objects = [
+            { id: 'sb_1', type: 'emitter', x: -7.5, z: -0.7, angle: 0, color: { r: 0, g: 1, b: 0 }, intensity: 1.0, movable: true, rotatable: true },
+            { id: 'sb_2', type: 'emitter', x: -7.5, z: 0.0, angle: 0, color: { r: 1, g: 1, b: 0 }, intensity: 1.0, movable: true, rotatable: true },
+            { id: 'sb_3', type: 'emitter', x: -7.5, z: 0.7, angle: 0, color: { r: 0, g: 1, b: 1 }, intensity: 1.0, movable: true, rotatable: true },
+            { id: 'sb_4', type: 'lens', x: -2.0, z: 0.0, angle: 0, ior: 1.65, movable: true, rotatable: true },
+            { id: 'sb_5', type: 'receiver', x: 1.25, z: 0.0, angle: 0, targetColor: { r: 1, g: 1, b: 1 }, minIntensity: 0.5, movable: true, rotatable: true }
+          ];
+          this.selectedId = 'sb_4';
+        } else if (preset === 'rgb') {
+          // RGB Additive Color Synthesis Lab
+          this.objects = [
+            { id: 'sb_1', type: 'emitter', x: -7.5, z: -3.0, angle: 0.35, color: { r: 1, g: 0, b: 0 }, intensity: 1.0, movable: true, rotatable: true },
+            { id: 'sb_2', type: 'emitter', x: -7.5, z: 0.0, angle: 0, color: { r: 0, g: 1, b: 0 }, intensity: 1.0, movable: true, rotatable: true },
+            { id: 'sb_3', type: 'emitter', x: -7.5, z: 3.0, angle: -0.35, color: { r: 0, g: 0, b: 1 }, intensity: 1.0, movable: true, rotatable: true },
+            { id: 'sb_4', type: 'receiver', x: 1.0, z: 0.0, angle: 0, targetColor: { r: 1, g: 1, b: 1 }, minIntensity: 0.5, movable: true, rotatable: true }
+          ];
+          this.selectedId = 'sb_1';
+        } else if (preset === 'cavity') {
+          // Multi-Mirror Optical Resonator Cavity
+          this.objects = [
+            { id: 'sb_1', type: 'emitter', x: -7.5, z: -2.5, angle: 0.15, color: { r: 1, g: 0, b: 1 }, intensity: 1.2, movable: true, rotatable: true },
+            { id: 'sb_2', type: 'mirror', x: 4.0, z: -3.5, angle: Math.PI, movable: true, rotatable: true },
+            { id: 'sb_3', type: 'mirror', x: -4.0, z: 3.5, angle: 0, movable: true, rotatable: true },
+            { id: 'sb_4', type: 'splitter', x: 0.0, z: 0.0, angle: 0.6, movable: true, rotatable: true },
+            { id: 'sb_5', type: 'receiver', x: 7.0, z: 3.0, angle: 0, targetColor: { r: 1, g: 0, b: 1 }, minIntensity: 0.3, movable: true, rotatable: true }
+          ];
+          this.selectedId = 'sb_4';
+        } else {
+          // Default Sandbox Showcase
+          this.objects = [
+            { id: 'sb_1', type: 'emitter', x: -7.5, z: 0.0, angle: 0, color: { r: 1, g: 1, b: 1 }, intensity: 1.2, movable: true, rotatable: true },
+            { id: 'sb_2', type: 'splitter', x: -2.5, z: 0.0, angle: Math.PI / 4, movable: true, rotatable: true },
+            { id: 'sb_3', type: 'prism', x: 2.5, z: 0.0, angle: 0.25, ior: 1.55, movable: true, rotatable: true },
+            { id: 'sb_4', type: 'filter', x: -2.5, z: 3.5, angle: Math.PI / 2, filterColor: { r: 0, g: 1, b: 1 }, movable: true, rotatable: true },
+            { id: 'sb_5', type: 'receiver', x: -2.5, z: 5.5, angle: 0, targetColor: { r: 0, g: 1, b: 1 }, minIntensity: 0.35, movable: true, rotatable: true },
+            { id: 'sb_6', type: 'receiver', x: 7.0, z: 2.8, angle: 0, targetColor: { r: 1, g: 1, b: 1 }, minIntensity: 0.35, movable: true, rotatable: true }
+          ];
+          this.selectedId = 'sb_3';
+        }
+
+        this.rebuildSceneObjects();
+        this.syncSelectionGizmo();
+        this.updateOpticsAndBeams();
+      }
+
+      spawnSandboxObject(type) {
+        if (this.mode !== 'sandbox') return;
+        const id = `custom_${Date.now()}_${this.sandboxCounter++}`;
+        // Find a clear spot near center
+        const offset = ((this.objects.length % 5) - 2) * 1.1;
+        const baseObj = {
+          id,
+          type,
+          x: offset,
+          z: offset * 0.5,
+          angle: 0,
+          movable: true,
+          rotatable: true
+        };
+
+        if (type === 'emitter') {
+          baseObj.color = { r: 0, g: 1, b: 1 };
+          baseObj.intensity = 1.0;
+        } else if (type === 'prism') {
+          baseObj.ior = 1.55;
+        } else if (type === 'lens') {
+          baseObj.ior = 1.65;
+        } else if (type === 'filter') {
+          baseObj.filterColor = { r: 1, g: 0, b: 0 };
+        } else if (type === 'receiver') {
+          baseObj.targetColor = { r: 0, g: 1, b: 1 };
+          baseObj.minIntensity = 0.35;
+        } else if (type === 'wall') {
+          baseObj.width = 2.4;
+          baseObj.depth = 0.45;
+        }
+
+        this.objects.push(baseObj);
+        this.selectedId = id;
+        sfx.playSelect();
+        this.rebuildSceneObjects();
+        this.syncSelectionGizmo();
+        this.updateOpticsAndBeams();
+      }
+
+      deleteSelectedObject() {
+        if (this.mode !== 'sandbox' || !this.selectedId) return;
+        this.objects = this.objects.filter(o => o.id !== this.selectedId);
+        this.selectedId = this.objects.length > 0 ? this.objects[this.objects.length - 1].id : null;
+        sfx.playServoTick();
+        this.rebuildSceneObjects();
+        this.syncSelectionGizmo();
+        this.updateOpticsAndBeams();
+      }
+
+      getSelectedObject() {
+        return this.objects.find(o => o.id === this.selectedId) || null;
+      }
+
+      syncSelectionGizmo() {
+        const obj = this.getSelectedObject();
+        if (!obj) {
+          this.selectionGizmo.visible = false;
+          return;
+        }
+        this.selectionGizmo.visible = true;
+        this.selectionGizmo.position.set(obj.x, 0, obj.z);
+        this.selectionGizmo.rotation.y = -obj.angle;
+      }
+
+      rotateSelected(deltaRad, countAsMove = true) {
+        const obj = this.getSelectedObject();
+        if (!obj || (!obj.rotatable && this.mode !== 'sandbox')) return;
+        obj.angle = (obj.angle + deltaRad + Math.PI * 2) % (Math.PI * 2);
+        const mesh = this.objectMeshes.get(obj.id);
+        if (mesh) mesh.rotation.y = -obj.angle;
+        if (countAsMove) this.moveCount++;
+        sfx.playServoTick();
+        this.syncSelectionGizmo();
+        this.updateOpticsAndBeams();
+      }
+
+      // -------------------------------------------------------------------------
+      // UI SYNCHRONIZATION
+      // -------------------------------------------------------------------------
+      updateUI() {
+        // Top HUD Metrics
+        const emitters = this.objects.filter(o => o.type === 'emitter');
+        const receivers = this.objects.filter(o => o.type === 'receiver');
+        const solvedCount = receivers.filter(r => r.isActivated).length;
+
+        document.getElementById('hud-active-lasers').textContent =
+          this.lasersActive ? `${emitters.length} ONLINE` : 'STANDBY';
+        document.getElementById('hud-active-lasers').className =
+          this.lasersActive ? 'text-cyan-300 font-bold' : 'text-slate-500 font-bold';
+
+        document.getElementById('hud-receivers').textContent = `${solvedCount} / ${receivers.length}`;
+        document.getElementById('hud-receivers').className =
+          solvedCount === receivers.length && receivers.length > 0
+            ? 'text-emerald-400 font-bold'
+            : 'text-amber-300 font-bold';
+
+        if (this.mode === 'campaign') {
+          const lvl = CAMPAIGN_LEVELS[this.currentLevelIndex];
+          document.getElementById('hud-moves').textContent = `${this.moveCount} (PAR ${lvl.par})`;
+          document.getElementById('hud-status').textContent = this.levelSolved ? 'SYNCHRONIZED' : 'ALIGNING';
+          document.getElementById('hud-status').className = this.levelSolved
+            ? 'text-emerald-400 font-bold'
+            : 'text-sky-400 font-bold';
+          document.getElementById('mission-badge').textContent = this.levelSolved ? 'COMPLETE' : 'IN PROGRESS';
+          document.getElementById('mission-badge').className = this.levelSolved
+            ? 'text-[10px] font-mono-tech px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
+            : 'text-[10px] font-mono-tech px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30';
+        } else {
+          document.getElementById('hud-moves').textContent = `${this.objects.length} DEVICES`;
+          document.getElementById('hud-status').textContent = 'SANDBOX LIVE';
+          document.getElementById('hud-status').className = 'text-amber-300 font-bold';
+        }
+
+        // Laser toggle button
+        const dot = document.getElementById('laser-power-dot');
+        const lbl = document.getElementById('laser-power-label');
+        if (this.lasersActive) {
+          dot.className = 'w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]';
+          lbl.textContent = 'BEAM ON';
+        } else {
+          dot.className = 'w-2 h-2 rounded-full bg-slate-500';
+          lbl.textContent = 'BEAM OFF';
+        }
+
+        // Receiver Cards List
+        document.getElementById('receiver-summary-chip').textContent = `${solvedCount} / ${receivers.length} CHARGED`;
+        const recList = document.getElementById('receiver-list');
+        recList.innerHTML = '';
+        receivers.forEach((rec, i) => {
+          const targetName = getColorLabel(rec.targetColor);
+          const cssColor = rgbToCss(rec.targetColor);
+          const pct = Math.min(100, Math.round((rec.receivedIntensity / (rec.minIntensity || 0.35)) * 100));
+          let stateText = 'AWAITING BEAM';
+          let stateClass = 'text-slate-400';
+          if (rec.isActivated) {
+            stateText = 'LOCKED & CHARGED';
+            stateClass = 'text-emerald-400 font-bold';
+          } else if (rec.isImpure) {
+            stateText = 'IMPURE SPECTRUM';
+            stateClass = 'text-rose-400 font-bold';
+          } else if (rec.hitCount > 0) {
+            stateText = `CHARGING (${pct}%)`;
+            stateClass = 'text-amber-300';
+          }
+
+          const card = document.createElement('div');
+          card.className = `rounded-lg p-2 border transition cursor-pointer ${
+            rec.isActivated
+              ? 'bg-emerald-950/40 border-emerald-500/40'
+              : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+          }`;
+          card.innerHTML = `
+            <div class="flex items-center justify-between text-[11px] mb-1">
+              <div class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full inline-block" style="background:${cssColor}; box-shadow: 0 0 8px ${cssColor}"></span>
+                <span class="font-semibold text-slate-200">CORE 0${i + 1} (${targetName})</span>
+              </div>
+              <span class="font-mono-tech text-[10px] ${stateClass}">${stateText}</span>
+            </div>
+            <div class="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+              <div class="h-full transition-all duration-200" style="width:${rec.isActivated ? 100 : pct}%; background:${cssColor}"></div>
+            </div>
+          `;
+          card.addEventListener('click', () => {
+            this.selectedId = rec.id;
+            sfx.playSelect();
+            this.syncSelectionGizmo();
+            this.updateUI();
+          });
+          recList.appendChild(card);
+        });
+
+        // Right-hand Optical Inspector
+        const sel = this.getSelectedObject();
+        const lockBadge = document.getElementById('inspector-lock-badge');
+        const emptyView = document.getElementById('inspector-empty');
+        const contentView = document.getElementById('inspector-content');
+
+        if (!sel) {
+          lockBadge.textContent = 'NO SELECTION';
+          lockBadge.className = 'text-[10px] font-mono-tech px-2 py-0.5 rounded bg-slate-800 text-slate-300';
+          emptyView.classList.remove('hidden');
+          contentView.classList.add('hidden');
+          return;
+        }
+
+        emptyView.classList.add('hidden');
+        contentView.classList.remove('hidden');
+
+        const canMove = sel.movable || this.mode === 'sandbox';
+        const canRotate = sel.rotatable || this.mode === 'sandbox';
+
+        if (canMove && canRotate) {
+          lockBadge.textContent = 'UNLOCKED';
+          lockBadge.className = 'text-[10px] font-mono-tech px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30';
+        } else if (canMove || canRotate) {
+          lockBadge.textContent = 'PARTIAL LOCK';
+          lockBadge.className = 'text-[10px] font-mono-tech px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30';
+        } else {
+          lockBadge.textContent = 'FIXED MOUNT';
+          lockBadge.className = 'text-[10px] font-mono-tech px-2 py-0.5 rounded bg-slate-800 text-slate-400';
+        }
+
+        let meta = { name: 'Optical Device', desc: '' };
+        switch (sel.type) {
+          case 'emitter':
+            meta = {
+              name: 'Coherent Laser Emitter',
+              desc: `Wavelength: ${getColorLabel(sel.color)} • Power: ${Math.round((sel.intensity || 1) * 100)}%`
+            };
+            break;
+          case 'mirror':
+            meta = { name: 'Front-Surface Mirror', desc: 'Dielectric Specular Reflector (R = 97%)' };
+            break;
+          case 'prism':
+            meta = { name: 'Equilateral Glass Prism', desc: `Refractive Crystal (n = ${(sel.ior || 1.52).toFixed(2)})` };
+            break;
+          case 'lens':
+            meta = { name: 'Biconvex Optical Lens', desc: `Converging Arc Optics (n = ${(sel.ior || 1.60).toFixed(2)})` };
+            break;
+          case 'splitter':
+            meta = { name: '50/50 Beam Splitter', desc: 'Half-Silvered Optic (49% R / 49% T)' };
+            break;
+          case 'filter':
+            meta = {
+              name: 'Dichroic Spectral Filter',
+              desc: `Passband: ${getColorLabel(sel.filterColor || { r: 1, g: 0, b: 0 })}`
+            };
+            break;
+          case 'receiver':
+            meta = {
+              name: 'Quantum Energy Receiver',
+              desc: `Target Signature: ${getColorLabel(sel.targetColor)}`
+            };
+            break;
+          case 'wall':
+            meta = { name: 'Titanium Bulkhead', desc: 'Opaque Beam Containment Barrier' };
+            break;
+        }
+
+        document.getElementById('insp-name').textContent = meta.name;
+        document.getElementById('insp-physics').textContent = meta.desc;
+        document.getElementById('insp-x').textContent = sel.x.toFixed(2);
+        document.getElementById('insp-z').textContent = sel.z.toFixed(2);
+
+        const deg = (((sel.angle * 180) / Math.PI) % 360 + 360) % 360;
+        document.getElementById('insp-angle').textContent = `${deg.toFixed(1)}°`;
+        document.getElementById('insp-angle-label').textContent = `${deg.toFixed(1)}°`;
+        document.getElementById('slider-angle').value = deg.toFixed(1);
+
+        const rotGroup = document.getElementById('insp-rotate-group');
+        if (canRotate && sel.type !== 'receiver') {
+          rotGroup.classList.remove('hidden');
+        } else {
+          rotGroup.classList.add('hidden');
+        }
+
+        // Refractive Index slider for Prisms & Lenses
+        const iorGroup = document.getElementById('insp-ior-group');
+        if (sel.type === 'prism' || sel.type === 'lens') {
+          iorGroup.classList.remove('hidden');
+          const iorVal = sel.ior || 1.52;
+          document.getElementById('insp-ior-val').textContent = iorVal.toFixed(2);
+          document.getElementById('slider-ior').value = iorVal;
+          document.getElementById('slider-ior').disabled = this.mode !== 'sandbox';
+        } else {
+          iorGroup.classList.add('hidden');
+        }
+
+        // Color swatches (in Sandbox for emitter, filter, receiver)
+        const colorGroup = document.getElementById('insp-color-group');
+        if (this.mode === 'sandbox' && (sel.type === 'emitter' || sel.type === 'filter' || sel.type === 'receiver')) {
+          colorGroup.classList.remove('hidden');
+          document.getElementById('insp-color-title').textContent =
+            sel.type === 'filter' ? 'Filter Passband Color' : sel.type === 'receiver' ? 'Target Receiver Color' : 'Laser Wavelength';
+        } else {
+          colorGroup.classList.add('hidden');
+        }
+
+        // Emitter Intensity slider (in Sandbox)
+        const intGroup = document.getElementById('insp-intensity-group');
+        if (this.mode === 'sandbox' && sel.type === 'emitter') {
+          intGroup.classList.remove('hidden');
+          const iv = sel.intensity ?? 1.0;
+          document.getElementById('insp-intensity-val').textContent = `${Math.round(iv * 100)}%`;
+          document.getElementById('slider-intensity').value = iv;
+        } else {
+          intGroup.classList.add('hidden');
+        }
+
+        // Sandbox delete button
+        const sbActions = document.getElementById('insp-sandbox-actions');
+        if (this.mode === 'sandbox') {
+          sbActions.classList.remove('hidden');
+        } else {
+          sbActions.classList.add('hidden');
+        }
+      }
+
+      // -------------------------------------------------------------------------
+      // CAMERA & POINTER / KEYBOARD INTERACTION
+      // -------------------------------------------------------------------------
+      updateCameraTransform(immediate = false) {
+        const lerpFactor = immediate ? 1.0 : 0.16;
+        this.camSpherical.radius += (this.camGoal.radius - this.camSpherical.radius) * lerpFactor;
+        this.camSpherical.theta += (this.camGoal.theta - this.camSpherical.theta) * lerpFactor;
+        this.camSpherical.phi += (this.camGoal.phi - this.camSpherical.phi) * lerpFactor;
+
+        const r = this.camSpherical.radius;
+        const sinPhi = Math.sin(this.camSpherical.phi);
+        const cosPhi = Math.cos(this.camSpherical.phi);
+        const sinTheta = Math.sin(this.camSpherical.theta);
+        const cosTheta = Math.cos(this.camSpherical.theta);
+
+        this.camera.position.set(
+          this.camTarget.x + r * sinPhi * sinTheta,
+          this.camTarget.y + r * cosPhi,
+          this.camTarget.z + r * sinPhi * cosTheta
+        );
+        this.camera.lookAt(this.camTarget);
+      }
+
+      getPointerBenchIntersection(clientX, clientY) {
+        const rect = this.renderer.domElement.getBoundingClientRect();
+        this.mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+        this.mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+        this.raycaster.setFromCamera(this.mouseNDC, this.camera);
+        const hitPoint = new THREE.Vector3();
+        const hit = this.raycaster.ray.intersectPlane(this.benchPlane, hitPoint);
+        return hit ? hitPoint : null;
+      }
+
+      pickObjectAtPointer(clientX, clientY) {
+        const rect = this.renderer.domElement.getBoundingClientRect();
+        this.mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+        this.mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+        this.raycaster.setFromCamera(this.mouseNDC, this.camera);
+
+        const meshes = Array.from(this.objectMeshes.values());
+        const intersects = this.raycaster.intersectObjects(meshes, true);
+        for (const hit of intersects) {
+          let curr = hit.object;
+          while (curr) {
+            if (curr.userData && curr.userData.objectId) {
+              return curr.userData.objectId;
+            }
+            curr = curr.parent;
+          }
+        }
+        return null;
+      }
+
+      bindEvents() {
+        const dom = this.renderer.domElement;
+
+        // Pointer Down (Mouse & Touch)
+        dom.addEventListener('pointerdown', (e) => {
+          sfx.init();
+          this.pointerDownPos = { x: e.clientX, y: e.clientY };
+          this.lastPointerPos = { x: e.clientX, y: e.clientY };
+
+          const hitId = this.pickObjectAtPointer(e.clientX, e.clientY);
+          if (hitId) {
+            this.selectedId = hitId;
+            sfx.playSelect();
+            this.syncSelectionGizmo();
+            this.updateUI();
+
+            const obj = this.getSelectedObject();
+            if (obj && (obj.movable || this.mode === 'sandbox')) {
+              const benchHit = this.getPointerBenchIntersection(e.clientX, e.clientY);
+              if (benchHit) {
+                this.isDraggingObject = true;
+                this.dragOffset.set(obj.x - benchHit.x, 0, obj.z - benchHit.z);
+                this.dragStartPos = { x: obj.x, z: obj.z };
+                dom.setPointerCapture(e.pointerId);
+                return;
+              }
+            }
+          }
+
+          // Otherwise start camera orbit
+          this.isOrbiting = true;
+          dom.setPointerCapture(e.pointerId);
+        });
+
+        // Pointer Move
+        dom.addEventListener('pointermove', (e) => {
+          if (this.isDraggingObject) {
+            const obj = this.getSelectedObject();
+            if (!obj) return;
+            const benchHit = this.getPointerBenchIntersection(e.clientX, e.clientY);
+            if (benchHit) {
+              let nx = benchHit.x + this.dragOffset.x;
+              let nz = benchHit.z + this.dragOffset.z;
+
+              // Grid snap (0.25 unit precision) when enabled
+              if (this.gridSnap) {
+                nx = Math.round(nx * 4) / 4;
+                nz = Math.round(nz * 4) / 4;
+              }
+
+              // Clamp within optical bench boundaries
+              nx = Math.max(LAB_BOUNDS.minX + 1.0, Math.min(LAB_BOUNDS.maxX - 1.0, nx));
+              nz = Math.max(LAB_BOUNDS.minZ + 1.0, Math.min(LAB_BOUNDS.maxZ - 1.0, nz));
+
+              if (nx !== obj.x || nz !== obj.z) {
+                obj.x = nx;
+                obj.z = nz;
+                const mesh = this.objectMeshes.get(obj.id);
+                if (mesh) mesh.position.set(obj.x, 0, obj.z);
+                this.syncSelectionGizmo();
+                this.updateOpticsAndBeams();
+                sfx.playServoTick();
+              }
+            }
+            return;
+          }
+
+          if (this.isOrbiting) {
+            const dx = e.clientX - this.lastPointerPos.x;
+            const dy = e.clientY - this.lastPointerPos.y;
+            this.lastPointerPos = { x: e.clientX, y: e.clientY };
+
+            this.camGoal.theta -= dx * 0.0065;
+            this.camGoal.phi = Math.max(0.08, Math.min(1.38, this.camGoal.phi - dy * 0.0065));
+          }
+        });
+
+        // Pointer Up
+        const endPointer = (e) => {
+          if (this.isDraggingObject) {
+            const obj = this.getSelectedObject();
+            if (obj && this.dragStartPos && (obj.x !== this.dragStartPos.x || obj.z !== this.dragStartPos.z)) {
+              this.moveCount++;
+              this.updateUI();
+            }
+            this.isDraggingObject = false;
+          }
+          if (this.isOrbiting) {
+            // Check if it was a quick tap on empty space to deselect
+            const dist = Math.hypot(e.clientX - this.pointerDownPos.x, e.clientY - this.pointerDownPos.y);
+            if (dist < 5) {
+              const hitId = this.pickObjectAtPointer(e.clientX, e.clientY);
+              if (!hitId) {
+                this.selectedId = null;
+                this.syncSelectionGizmo();
+                this.updateUI();
+              }
+            }
+            this.isOrbiting = false;
+          }
+        };
+        dom.addEventListener('pointerup', endPointer);
+        dom.addEventListener('pointercancel', endPointer);
+
+        // Scroll Wheel Zoom
+        dom.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          this.camGoal.radius = Math.max(7.5, Math.min(27.0, this.camGoal.radius + e.deltaY * 0.01));
+        }, { passive: false });
+
+        // Keyboard Shortcuts
+        window.addEventListener('keydown', (e) => {
+          if (e.target.tagName === 'INPUT') return;
+          const k = e.key.toLowerCase();
+          this.keysHeld[k] = true;
+
+          if (e.code === 'Space') {
+            e.preventDefault();
+            this.lasersActive = !this.lasersActive;
+            sfx.playLaserToggle(this.lasersActive);
+            this.updateOpticsAndBeams();
+          } else if (k === 'r') {
+            if (this.mode === 'campaign') this.loadLevel(this.currentLevelIndex);
+            else this.loadSandboxPreset('default');
+          } else if (k === 'g') {
+            this.toggleGridSnap();
+          } else if (k === 'delete' || k === 'backspace') {
+            if (this.mode === 'sandbox') this.deleteSelectedObject();
+          }
+        });
+
+        window.addEventListener('keyup', (e) => {
+          this.keysHeld[e.key.toLowerCase()] = false;
+        });
+
+        // Window Resize
+        window.addEventListener('resize', () => {
+          const w = this.container.clientWidth || window.innerWidth;
+          const h = this.container.clientHeight || window.innerHeight;
+          this.camera.aspect = w / h;
+          this.camera.updateProjectionMatrix();
+          this.renderer.setSize(w, h);
+        });
+
+        // UI Button Listeners
+        document.getElementById('btn-mode-campaign').addEventListener('click', () => this.loadLevel(this.currentLevelIndex));
+        document.getElementById('btn-mode-sandbox').addEventListener('click', () => this.enterSandbox('default'));
+
+        document.getElementById('btn-prev-level').addEventListener('click', () => this.loadLevel(this.currentLevelIndex - 1));
+        document.getElementById('btn-next-level').addEventListener('click', () => this.loadLevel(this.currentLevelIndex + 1));
+
+        document.getElementById('btn-toggle-laser').addEventListener('click', () => {
+          this.lasersActive = !this.lasersActive;
+          sfx.playLaserToggle(this.lasersActive);
+          this.updateOpticsAndBeams();
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+          sfx.playSelect();
+          if (this.mode === 'campaign') this.loadLevel(this.currentLevelIndex);
+          else this.loadSandboxPreset('default');
+        });
+
+        document.getElementById('btn-grid-snap').addEventListener('click', () => this.toggleGridSnap());
+
+        document.getElementById('btn-audio').addEventListener('click', () => {
+          const on = sfx.toggle();
+          document.getElementById('icon-audio-on').classList.toggle('hidden', !on);
+          document.getElementById('icon-audio-off').classList.toggle('hidden', on);
+        });
+
+        // Inspector Rotate Controls
+        document.getElementById('btn-rot-ccw').addEventListener('click', () => this.rotateSelected(-5 * Math.PI / 180));
+        document.getElementById('btn-rot-cw').addEventListener('click', () => this.rotateSelected(5 * Math.PI / 180));
+        document.getElementById('btn-rot-fine-ccw').addEventListener('click', () => this.rotateSelected(-0.5 * Math.PI / 180));
+        document.getElementById('btn-rot-fine-cw').addEventListener('click', () => this.rotateSelected(0.5 * Math.PI / 180));
+
+        document.getElementById('slider-angle').addEventListener('input', (e) => {
+          const obj = this.getSelectedObject();
+          if (!obj || (!obj.rotatable && this.mode !== 'sandbox')) return;
+          obj.angle = (parseFloat(e.target.value) * Math.PI) / 180;
+          const mesh = this.objectMeshes.get(obj.id);
+          if (mesh) mesh.rotation.y = -obj.angle;
+          this.syncSelectionGizmo();
+          this.updateOpticsAndBeams();
+        });
+
+        // Refractive Index Slider
+        document.getElementById('slider-ior').addEventListener('input', (e) => {
+          const obj = this.getSelectedObject();
+          if (!obj || this.mode !== 'sandbox') return;
+          obj.ior = parseFloat(e.target.value);
+          this.updateOpticsAndBeams();
+        });
+
+        // Intensity Slider
+        document.getElementById('slider-intensity').addEventListener('input', (e) => {
+          const obj = this.getSelectedObject();
+          if (!obj || this.mode !== 'sandbox' || obj.type !== 'emitter') return;
+          obj.intensity = parseFloat(e.target.value);
+          this.updateOpticsAndBeams();
+        });
+
+        // Color Swatches
+        document.querySelectorAll('#insp-color-swatches button').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const obj = this.getSelectedObject();
+            if (!obj || this.mode !== 'sandbox') return;
+            const [r, g, b] = btn.dataset.rgb.split(',').map(Number);
+            const c = { r, g, b };
+            if (obj.type === 'emitter') {
+              obj.color = c;
+            } else if (obj.type === 'filter') {
+              obj.filterColor = c;
+            } else if (obj.type === 'receiver') {
+              obj.targetColor = c;
+            }
+            sfx.playSelect();
+            this.rebuildSceneObjects();
+            this.syncSelectionGizmo();
+            this.updateOpticsAndBeams();
+          });
+        });
+
+        // Sandbox Spawners & Presets
+        document.querySelectorAll('[data-spawn]').forEach(btn => {
+          btn.addEventListener('click', () => this.spawnSandboxObject(btn.dataset.spawn));
+        });
+        document.querySelectorAll('[data-preset]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            sfx.playSelect();
+            this.loadSandboxPreset(btn.dataset.preset);
+          });
+        });
+        document.getElementById('btn-sandbox-clear').addEventListener('click', () => {
+          sfx.playServoTick();
+          this.loadSandboxPreset('clear');
+        });
+        document.getElementById('btn-delete-obj').addEventListener('click', () => this.deleteSelectedObject());
+
+        // Solved Modal Buttons
+        document.getElementById('btn-replay-level').addEventListener('click', () => this.loadLevel(this.currentLevelIndex));
+        document.getElementById('btn-next-campaign').addEventListener('click', () => {
+          if (this.currentLevelIndex >= CAMPAIGN_LEVELS.length - 1) {
+            this.enterSandbox('default');
+          } else {
+            this.loadLevel(this.currentLevelIndex + 1);
+          }
+        });
+
+        // Camera View Presets
+        document.getElementById('btn-cam-top').addEventListener('click', () => {
+          this.camGoal = { radius: 19.5, theta: 0, phi: 0.08 };
+        });
+        document.getElementById('btn-cam-iso').addEventListener('click', () => {
+          this.camGoal = { radius: 18.5, theta: 0, phi: 0.68 };
+        });
+      }
+
+      toggleGridSnap() {
+        this.gridSnap = !this.gridSnap;
+        const btn = document.getElementById('btn-grid-snap');
+        btn.innerHTML = `<span class="font-mono-tech">SNAP: ${this.gridSnap ? 'ON' : 'OFF'}</span>`;
+        btn.classList.toggle('btn-active', this.gridSnap);
+        sfx.playSelect();
+      }
+
+      // -------------------------------------------------------------------------
+      // MAIN ANIMATION LOOP
+      // -------------------------------------------------------------------------
+      animate(time = 0) {
+        requestAnimationFrame((t) => this.animate(t));
+        const dt = 0.016;
+
+        // Smooth continuous Q/E keyboard rotation
+        const rotSpeed = this.keysHeld['shift'] ? 0.35 : 1.45;
+        if (this.keysHeld['q']) {
+          this.rotateSelected(-rotSpeed * dt, false);
+        }
+        if (this.keysHeld['e']) {
+          this.rotateSelected(rotSpeed * dt, false);
+        }
+
+        // Update camera damping
+        this.updateCameraTransform(false);
+
+        // Animate photon packets along active laser beams
+        for (const pkt of this.photonPackets) {
+          pkt.phase = (pkt.phase + dt * (3.8 / Math.max(1.2, pkt.len))) % 1.0;
+          pkt.mesh.position.lerpVectors(pkt.p1, pkt.p2, pkt.phase);
+        }
+
+        // Animate holographic rings
+        for (const hr of this.holoRings) {
+          hr.r1.rotation.z += dt * 0.4;
+          hr.r2.rotation.z -= dt * 0.85;
+        }
+
+        // Animate receiver cores & selection gizmo pulse
+        for (const obj of this.objects) {
+          if (obj.type === 'receiver') {
+            const mesh = this.objectMeshes.get(obj.id);
+            if (mesh) {
+              const core = mesh.getObjectByName('receiverCore');
+              if (core) {
+                core.rotation.y += dt * (obj.isActivated ? 3.2 : 0.8);
+                core.rotation.x += dt * (obj.isActivated ? 1.8 : 0.3);
+                core.material.emissiveIntensity = obj.isActivated
+                  ? 1.15 + Math.sin(time * 0.008) * 0.3
+                  : 0.25;
+              }
+            }
+          }
+        }
+
+        if (this.selectionGizmo.visible) {
+          const s = 1.0 + Math.sin(time * 0.006) * 0.03;
+          this.selectionGizmo.scale.set(s, 1, s);
+        }
+
+        this.renderer.render(this.scene, this.camera);
+      }
+    }
+
+    // Initialize simulation strictly after window onload
+    window.onload = function () {
+      const app = new PrismLabApp();
+      app.animate();
+    };
+  </script>
+</body>
+</html>

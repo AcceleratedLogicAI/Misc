@@ -1,0 +1,1 @@
+This video is going to be a little different, as instead of breaking down a topic in AI, we're going to be testing AI models by making them attempt to make the same game.
